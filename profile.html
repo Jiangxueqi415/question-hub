@@ -1,7 +1,114 @@
-<!-- 视觉呈现：顶部导航 + 个人积分大卡片 + 两个列表 + 底部导航。
-• 页面元素：
-	• 积分卡片：居中的大卡片，包含文字“我的可用积分”和一个超大的数字 <h1 id="profile-points">50</h1>。
-	• 列表一：我发布过的问卷（静态假数据 1-2 条即可）。
-	• 列表二：我填写过的问卷（静态假数据 1-2 条即可，或者用 JS 动态读取 claimed 数组渲染出刚填过的问卷 ID）。
-• 交互逻辑：
-	• 页面加载时，从 localStorage 读取真实积分，同时更新顶部导航和中间的大数字。 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问卷互助平台 - 首页</title>
+    <!-- 引入 Bootstrap 5 的样式 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入你自己的样式 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-light">
+
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-dark bg-primary sticky-top">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">问卷互助</span>
+            <div class="d-flex align-items-center gap-2">
+                <!-- 这里显示积分（data-points 供 app.js 统一刷新） -->
+                <span class="text-white fw-bold small text-nowrap">当前积分: <span id="top-points" data-points>50</span> 分</span>
+                <!-- 一键重置：清空 points / claimed 后刷新 -->
+                <button type="button" class="btn btn-sm btn-light text-primary text-nowrap"
+                        onclick="resetDemoData()">重置演示</button>
+            </div>
+        </div>
+    </nav>
+
+    
+	<div class="container pb-5 mt-3">
+    <div class="card mb-4">
+        <div class="card-body">
+            <h4>我的积分：<span id="profile-points">50</span></h4>
+        </div>
+    </div>
+
+    <h5 class="mb-2">我发布的问卷</h5>
+    <div id="my-surveys" class="mb-5">
+    </div>
+
+    <h5 class="mb-2">我填写过的问卷</h5>
+    <div id="my-history">
+    </div>
+</div>
+
+    <!-- 底部导航栏（固定在底部） -->
+    <nav class="navbar fixed-bottom navbar-light bg-white border-top">
+        <div class="container justify-content-around">
+            <a class="nav-link text-secondary" href="index.html">首页</a>
+            <a class="nav-link text-secondary" href="publish.html">发布问卷</a>
+            <a class="nav-link text-primary fw-bold" href="profile.html">我的</a>
+        </div>
+    </nav>
+
+    <!-- 引入 Bootstrap 的 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入你自己的 JS -->
+    <script src="js/app.js"></script>
+	<script>
+function renderMyPublish(){
+  var list = window.SurveyStore.mine();
+  var box = document.getElementById('my-surveys');
+  if(list.length === 0){
+    box.innerHTML = '<p class="text-muted">还没有发布过问卷</p>';
+    return;
+  }
+  box.innerHTML = '';
+  list.forEach(function(item){
+    var div = document.createElement('div');
+    div.className = 'd-flex justify-content-between align-items-center border-bottom py-2';
+    div.innerHTML = `
+      <span>${item.title}</span>
+      <div>
+        <a href="detail.html?id=${item.id}" class="me-2">查看</a>
+        <button class="btn btn-sm btn-outline-danger" onclick="delSurvey(${item.id})">删除</button>
+      </div>
+    `;
+    box.appendChild(div);
+  })
+}
+function renderMyHistory(){
+  var list = window.SurveyStore.history();
+  var box = document.getElementById('my-history');
+  if(list.length === 0){
+    box.innerHTML = '<p class="text-muted">还没有填写过问卷</p>';
+    return;
+  }
+  box.innerHTML = '';
+  list.forEach(function(item){
+    var div = document.createElement('div');
+    div.className = 'border-bottom py-2';
+    if(item.exists){
+      div.textContent = item.title + " （填写获得 "+ item.reward +" 分）";
+    }else{
+      div.textContent = "问卷已删除";
+      div.className += " text-muted";
+    }
+    box.appendChild(div);
+  })
+}
+function delSurvey(id){
+  if(confirm('确定要删除这份问卷吗？')){
+    window.SurveyStore.remove(id);
+    renderMyPublish();
+  }
+}
+window.addEventListener('load',function(){
+  renderMyPublish();
+  renderMyHistory();
+  var userInfo = window.SurveyStore.getUser();
+  document.getElementById('profile-points').innerText = userInfo.score;
+})
+</script>
+</body>
+</html>

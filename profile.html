@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>我的 - 问卷互助</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-body">
+  <header class="app-topbar">
+    <div class="app-topbar__inner">
+      <a class="app-brand" href="index.html">问卷互助</a>
+      <div class="app-topbar__right">
+        <span class="top-points">当前积分: <strong id="top-points">50</strong> 分</span>
+        <button type="button" class="btn btn-light btn-sm reset-btn" id="reset-demo">重置演示</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="app-container profile-container">
+      <section class="points-hero" aria-label="我的积分">
+        <span class="points-hero__label">我的积分</span>
+        <div class="points-hero__row">
+          <h1 class="points-hero__value" id="profile-points">50</h1>
+          <span class="points-hero__unit">分</span>
+        </div>
+        <a class="points-hero__link" href="index.html">去填写问卷赚积分 →</a>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>我发布的问卷</h2>
+          <a class="panel__action" href="publish.html">发布新问卷</a>
+        </div>
+        <div id="my-surveys" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>我填写过的问卷</h2>
+        </div>
+        <div id="my-history" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="底部导航">
+    <a class="bottom-nav__item" href="index.html">首页</a>
+    <a class="bottom-nav__item" href="publish.html">发布问卷</a>
+    <a class="bottom-nav__item is-active" href="profile.html" aria-current="page">我的</a>
+  </nav>
+
+  <script src="js/app.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>

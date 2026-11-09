@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>发布问卷 - 问卷互助</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-body">
+  <header class="app-topbar">
+    <div class="app-topbar__inner">
+      <a class="app-brand" href="index.html">问卷互助</a>
+      <div class="app-topbar__right">
+        <span class="top-points">当前积分: <strong id="top-points">50</strong> 分</span>
+        <button type="button" class="btn btn-light btn-sm reset-btn" id="reset-demo">重置演示</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="app-container">
+      <h1 class="page-heading" id="page-heading">发布问卷</h1>
+
+      <div id="edit-banner" class="alert alert-info edit-banner d-none" role="status"></div>
+
+      <form id="publish-form" class="publish-form" novalidate>
+        <section class="meta-card" aria-label="问卷基本信息">
+          <div class="meta-grid">
+            <div class="meta-field">
+              <label for="publisher">发布者</label>
+              <input type="text" class="form-control" id="publisher" maxlength="20" placeholder="自动使用当前用户" autocomplete="nickname">
+            </div>
+            <div class="meta-field">
+              <label for="question-count">题目数量</label>
+              <input type="number" class="form-control" id="question-count" min="1" max="10" step="1" value="1" inputmode="numeric">
+            </div>
+            <div class="meta-field">
+              <label for="minutes">预计耗时（分钟）</label>
+              <input type="number" class="form-control" id="minutes" min="1" max="60" step="1" value="3" inputmode="numeric">
+            </div>
+            <div class="meta-field">
+              <label for="category">分类</label>
+              <select class="form-select" id="category"></select>
+            </div>
+          </div>
+          <p class="meta-hint">发布者按当前用户信息自动填入；数字输入框不接受负数。</p>
+        </section>
+
+        <div class="publish-center">
+          <section class="title-block">
+            <label class="form-label" for="title">问卷标题</label>
+            <input type="text" class="form-control title-input" id="title" maxlength="20" placeholder="请输入问卷标题（最多 20 字）" autocomplete="off">
+            <div class="char-counter"><span id="title-count">0</span>/20</div>
+          </section>
+
+          <section class="material-block">
+            <label class="form-label" for="material">上传素材（封面图，可选）</label>
+            <input type="file" class="form-control" id="material" accept="image/*">
+            <p class="form-hint">支持常见图片格式，大小不超过 2MB；发布后会展示在问卷详情页。</p>
+            <div class="material-preview d-none" id="material-preview">
+              <img id="material-preview-img" alt="素材预览">
+              <button type="button" class="btn btn-sm btn-outline-danger" id="remove-material">移除素材</button>
+            </div>
+          </section>
+        </div>
+
+        <section id="questions" class="questions publish-center" aria-label="题目设置"></section>
+
+        <div class="add-question-row publish-center">
+          <button type="button" class="btn btn-outline-primary" id="add-question">＋ 添加题目</button>
+          <span class="form-hint" id="question-limit-hint">最多 10 道题</span>
+        </div>
+
+        <div class="form-error d-none publish-center" id="form-error" role="alert"></div>
+
+        <section class="publish-actions publish-center">
+          <button type="submit" class="btn btn-primary" id="publish-submit">消耗 10 积分发布问卷</button>
+          <button type="button" class="btn btn-outline-secondary" id="reset-form">重置</button>
+        </section>
+
+        <div class="publish-center">
+          <p class="points-hint d-none" id="points-hint"></p>
+          <p class="lock-hint">
+            发布即锁定：锁定后发布者仍可修改题目，参与填写者无权更改。
+          </p>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="底部导航">
+    <a class="bottom-nav__item" href="index.html">首页</a>
+    <a class="bottom-nav__item is-active" href="publish.html" aria-current="page">发布问卷</a>
+    <a class="bottom-nav__item" href="profile.html">我的</a>
+  </nav>
+
+  <template id="question-template">
+    <section class="question-card">
+      <div class="question-head">
+        <h2 class="question-no">第 1 题</h2>
+        <div class="question-head__actions">
+          <select class="form-select form-select-sm question-type" aria-label="题型">
+            <option value="single">单选</option>
+            <option value="multiple">多选</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-danger remove-question">删除题目</button>
+        </div>
+      </div>
+      <label class="form-label">题目</label>
+      <input type="text" class="form-control question-text" maxlength="100" placeholder="请输入题目内容（最多 100 字）">
+      <div class="options-head">
+        <span class="form-label mb-0">选项</span>
+        <span class="option-hint">2-6 个，不能重复</span>
+      </div>
+      <div class="options"></div>
+      <button type="button" class="btn btn-sm btn-link add-option px-0">＋ 添加选项</button>
+      <div class="answer-box">
+        <label class="form-label">正确答案（选填）</label>
+        <input type="text" class="form-control answer-input" maxlength="23" placeholder="如：A（只能填 1 个）">
+        <p class="form-hint">按选项字母填写；多选可填多个，如 A,C。提交后展示参考答案。</p>
+      </div>
+    </section>
+  </template>
+
+  <template id="option-template">
+    <div class="option-row">
+      <span class="option-letter">A</span>
+      <input type="text" class="form-control option-input" maxlength="50" placeholder="请输入选项内容">
+      <button type="button" class="btn btn-outline-secondary remove-option" aria-label="删除选项">×</button>
+    </div>
+  </template>
+
+  <dialog id="success-dialog" class="app-dialog">
+    <h2 id="success-dialog-title">发布成功</h2>
+    <p id="success-dialog-body"></p>
+    <form method="dialog">
+      <button class="btn btn-primary w-100" value="ok">确定</button>
+    </form>
+  </dialog>
+
+  <script src="js/app.js"></script>
+  <script src="js/publish.js"></script>
+</body>
+</html>

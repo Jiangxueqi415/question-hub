@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>问卷详情 - 问卷互助</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-body">
+  <header class="app-topbar">
+    <div class="app-topbar__inner">
+      <a class="app-brand" href="index.html">问卷互助</a>
+      <div class="app-topbar__right">
+        <span class="top-points">当前积分: <strong id="top-points">50</strong> 分</span>
+        <button type="button" class="btn btn-light btn-sm reset-btn" id="reset-demo">重置演示</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="app-container detail-container">
+      <a class="back-link" href="index.html">← 返回首页</a>
+      <div id="detail-root"></div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="底部导航">
+    <a class="bottom-nav__item is-active" href="index.html" aria-current="page">首页</a>
+    <a class="bottom-nav__item" href="publish.html">发布问卷</a>
+    <a class="bottom-nav__item" href="profile.html">我的</a>
+  </nav>
+
+  <script src="js/app.js"></script>
+  <script src="js/detail.js"></script>
+</body>
+</html>

@@ -1,1 +1,23 @@
-/*测试，写的时候直接删除该注释*/
+/* 1. 全局字体设置（让字看起来更顺眼） */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* 稍微加一点淡淡的背景色，配合Bootstrap的bg-light */
+    background-color: #f4f7f6 !important; 
+}
+
+/* 2. 卡片悬浮特效（鼠标放上去卡片稍微浮起来，有交互感） */
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border-radius: 12px; /* 圆角更大一点 */
+    border: none;
+}
+
+.card:hover {
+    transform: translateY(-3px); /* 鼠标悬停时上浮3像素 */
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; /* 阴影加深 */
+}
+
+/* 3. 底部导航栏微调 */
+.navbar.fixed-bottom {
+    box-shadow: 0 -2px 10px rgba(0,0,0,.05); /* 底部加点小阴影，更有立体感 */
+}

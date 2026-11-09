@@ -9,21 +9,25 @@
 </head>
 <body class="bg-light">
 
+    <!-- 返回首页必须是真链接，不能是 href=" "，也不依赖 JS -->
     <nav class="navbar navbar-dark bg-primary sticky-top">
         <div class="container">
-            <a class="navbar-brand" href=" ">⬅ 返回首页</a >
-            <span class="text-white fw-bold">当前积分: <span id="top-points">50</span> 分</span>
+            <a class="navbar-brand" href="index.html">⬅ 返回首页</a>
+            <span class="text-white fw-bold">当前积分: <span id="top-points" data-points>50</span> 分</span>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4 mb-5 pb-5">
         <div class="card shadow-sm">
             <div class="card-body">
-                <h4 class="card-title text-primary">问卷详情</h4>
-                <p class="text-muted">这里模拟问卷的填写界面...</p >
+                <!-- 标题和题目由 app.js 按 URL 中的 id 渲染 -->
+                <h4 class="card-title text-primary" id="q-title">问卷详情</h4>
+                <p class="text-muted small mb-3" id="q-meta"></p>
                 <hr>
-                <!-- 核心按钮 -->
-                <button id="claim-btn" class="btn btn-success w-100 py-2" onclick="claimPoints()">提交问卷并领取积分</button>
+                <div id="q-body"></div>
+
+                <!-- 核心按钮：点击触发 claimPoints() -->
+                <button id="claim-btn" class="btn btn-success w-100 py-2 mt-2" onclick="claimPoints()">提交问卷并领取积分</button>
                 <div id="tip" class="text-success text-center mt-2 fw-bold" style="display: none;">积分 +5 成功！</div>
             </div>
         </div>

@@ -15,35 +15,35 @@
     <nav class="navbar navbar-dark bg-primary sticky-top">
         <div class="container">
             <span class="navbar-brand mb-0 h1">问卷互助</span>
-            <!-- 这里显示积分 -->
-            <span class="text-white fw-bold">当前积分: <span id="top-points">50</span> 分</span>
+            <!-- 这里显示积分（data-points 供 app.js 统一刷新） -->
+            <span class="text-white fw-bold">当前积分: <span id="top-points" data-points>50</span> 分</span>
         </div>
     </nav>
 
     <!-- 主体内容区 -->
     <div class="container mt-4 mb-5 pb-5">
         <h4 class="mb-3">最新问卷</h4>
-        
+
         <!-- 问卷列表（先写死假数据） -->
         <div class="row" id="question-list">
-            <!-- 卡片 1 -->
+            <!-- 卡片 1：必须带 id=1，data-qid 用于领取后置灰 -->
             <div class="col-12 mb-3">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <h5 class="card-title text-primary">大学生网购消费习惯调查</h5>
-                        <p class="card-text text-muted small">发布者: 张三 | 预计耗时: 3分钟</p >
-                        <a href=" " class="btn btn-outline-primary w-100">去填写 (赚 5 积分)</a >
+                        <p class="card-text text-muted small">发布者: 张三 | 预计耗时: 3分钟</p>
+                        <a href="detail.html?id=1" data-qid="1" class="btn btn-outline-primary w-100">去填写 (赚 5 积分)</a>
                     </div>
                 </div>
             </div>
 
-            <!-- 卡片 2 -->
+            <!-- 卡片 2：id=2 -->
             <div class="col-12 mb-3">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <h5 class="card-title text-primary">关于校园食堂满意度的调研</h5>
-                        <p class="card-text text-muted small">发布者: 李四 | 预计耗时: 2分钟</p >
-                        <a href="detail.html?id=2" class="btn btn-outline-primary w-100">去填写 (赚 5 积分)</a >
+                        <p class="card-text text-muted small">发布者: 李四 | 预计耗时: 2分钟</p>
+                        <a href="detail.html?id=2" data-qid="2" class="btn btn-outline-primary w-100">去填写 (赚 5 积分)</a>
                     </div>
                 </div>
             </div>
@@ -53,9 +53,9 @@
     <!-- 底部导航栏（固定在底部） -->
     <nav class="navbar fixed-bottom navbar-light bg-white border-top">
         <div class="container justify-content-around">
-            <a class="nav-link text-primary fw-bold" href="index.html">首页</a >
-            <a class="nav-link text-secondary" href="publish.html">发布问卷</a >
-            <a class="nav-link text-secondary" href="profile.html">我的</a >
+            <a class="nav-link text-primary fw-bold" href="index.html">首页</a>
+            <a class="nav-link text-secondary" href="publish.html">发布问卷</a>
+            <a class="nav-link text-secondary" href="profile.html">我的</a>
         </div>
     </nav>
 

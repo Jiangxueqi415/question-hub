@@ -21,3 +21,129 @@ body {
 .navbar.fixed-bottom {
     box-shadow: 0 -2px 10px rgba(0,0,0,.05); /* 底部加点小阴影，更有立体感 */
 }
+
+/* ============================================================
+ * 发布问卷页
+ * 只作用于发布页/详情页新增元素，不改变其它页面的卡片结构。
+ * ============================================================ */
+
+.publish-column {
+    max-width: 820px;
+    padding-bottom: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 表单卡片不跟随通用 .card:hover 上浮，避免填写时晃动 */
+.publish-panel {
+    transition: none;
+}
+
+.publish-panel:hover {
+    transform: none;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+}
+
+.publish-title-input {
+    height: 52px;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 500;
+}
+
+.publish-title-input::placeholder {
+    font-weight: 400;
+}
+
+.publish-question-no {
+    font-size: .95rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.publish-type-select {
+    width: 92px;
+}
+
+.publish-option-row .form-control {
+    flex: 1;
+    min-width: 0;
+}
+
+.publish-option-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    color: #0d6efd;
+    background: #e7f1ff;
+    border-radius: 50%;
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.publish-option-row .remove-option {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.publish-option-row .remove-option:disabled {
+    opacity: .35;
+}
+
+.publish-answer-box {
+    padding: .85rem;
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    border-radius: 10px;
+}
+
+.publish-material-img {
+    display: block;
+    max-width: 240px;
+    max-height: 150px;
+    object-fit: cover;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+}
+
+.publish-actions .btn {
+    min-height: 52px;
+    border-radius: 10px;
+}
+
+/* 详情页：发布页上传的封面 */
+.survey-cover {
+    display: block;
+    width: 100%;
+    max-height: 280px;
+    margin-bottom: 1rem;
+    object-fit: cover;
+    background: #f8fafc;
+    border-radius: 10px;
+}
+
+@media (max-width: 575.98px) {
+    .publish-title-input {
+        font-size: 1rem;
+    }
+
+    .publish-type-select {
+        width: 84px;
+    }
+
+    .publish-actions {
+        flex-direction: column;
+    }
+
+    .publish-actions .btn {
+        width: 100%;
+    }
+}

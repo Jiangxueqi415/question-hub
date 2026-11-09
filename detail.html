@@ -26,8 +26,8 @@
                 <hr>
                 <div id="q-body"></div>
 
-                <!-- 核心按钮：点击触发 claimPoints() -->
-                <button id="claim-btn" class="btn btn-success w-100 py-2 mt-2" onclick="claimPoints()">提交问卷并领取积分</button>
+                <!-- 核心按钮：未答完为灰色不可点，答完后由 app.js 变绿启用 -->
+                <button id="claim-btn" class="btn btn-secondary w-100 py-2 mt-2" onclick="claimPoints()" disabled>请先答完题目</button>
                 <div id="tip" class="text-success text-center mt-2 fw-bold" style="display: none;">积分 +5 成功！</div>
             </div>
         </div>

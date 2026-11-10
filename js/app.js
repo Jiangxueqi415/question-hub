@@ -915,7 +915,10 @@
         history: getClaimedSurveys,
         categories: CATEGORIES.slice(),
         reward: REWARD,
-        publishCost: PUBLISH_COST
+        publishCost: PUBLISH_COST,
+        getUser: function () {
+            return { score: readPoints() };
+        }
     };
 
     Object.defineProperty(store, 'points', {

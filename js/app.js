@@ -43,6 +43,24 @@
     var COVER_MAX_LEN = 450000;  // 封面素材压缩后的 data URL 上限，避免撑爆 localStorage
     var CATEGORIES = ['学习', '生活', '调研', '其他'];
 
+    /* 信誉分：发布门槛 + 等级 + 流水（纯前端演示，数据只在本机） */
+    var CREDIT_KEY = 'credit';
+    var CREDIT_LOG_KEY = 'creditLog';
+    var POINTS_LOG_KEY = 'pointsLog';
+    var ONBOARD_KEY = 'onboarded';
+    var INITIAL_CREDIT = 0;
+    var CREDIT_MAX = 100;
+    var CREDIT_PUBLISH_MIN = 40;
+    var ONBOARD_CREDIT = 40;
+    var ONBOARD_POINTS = 10;
+    var LOG_MAX = 60;
+    var CREDIT_LEVELS = [
+        { min: 85, name: '优秀', badge: 'bg-success' },
+        { min: 70, name: '良好', badge: 'bg-primary' },
+        { min: 40, name: '一般', badge: 'bg-warning text-dark' },
+        { min: 0, name: '较差', badge: 'bg-secondary' }
+    ];
+
     /* ---------------- 内置问卷（演示用，不属于用户发布） ---------------- */
     var SURVEYS = {
         '1': {
@@ -89,6 +107,15 @@
     // 返回是否真正写入成功：涉及积分/领取记录的写操作必须检查结果
     function lsSet(key, value) {
         try { localStorage.setItem(key, value); return true; } catch (err) { return false; }
+    }
+
+    // 回滚用：写入失败后把某个键恢复到之前的值（之前不存在就删掉）
+    function lsRestore(key, value) {
+        if (value === null || value === undefined) {
+            try { localStorage.removeItem(key); } catch (err) { /* 存储不可用时忽略 */ }
+            return;
+        }
+        lsSet(key, value);
     }
 
     function readPoints() {
@@ -339,6 +366,17 @@
         var checked = normalizeQuestions(data.questions);
         if (checked.error) return { ok: false, error: checked.error };
 
+        // 发布门槛：信誉分不足直接拒绝，不写问卷也不扣积分
+        var credit = readCredit();
+        if (credit < CREDIT_PUBLISH_MIN) {
+            return {
+                ok: false,
+                code: 'CREDIT_NOT_ENOUGH',
+                error: '信誉分不足：发布需要 ' + CREDIT_PUBLISH_MIN + ' 分，当前 ' + credit +
+                    ' 分。请先完成新人任务或填写一份他人问卷。'
+            };
+        }
+
         // 发布要花积分：不足时一份都不写，避免出现“免费问卷”
         var points = readPoints();
         if (points < PUBLISH_COST) {
@@ -374,6 +412,10 @@
             writeSurveys(list.filter(function (s) { return s.id !== survey.id; }));
             return { ok: false, code: 'STORAGE_ERROR', error: '积分保存失败，问卷没有发布，请重试' };
         }
+
+        pushLog(POINTS_LOG_KEY, {
+            time: Date.now(), delta: -PUBLISH_COST, reason: '发布问卷：' + title, after: readPoints()
+        });
 
         renderSurveyList();          // 若发布页没有列表容器，这里自动跳过
         refreshPoints();
@@ -525,6 +567,245 @@
         });
     }
 
+    /* ---------------- 信誉分与流水 ---------------- */
+    function readCredit() {
+        var n = parseInt(lsGet(CREDIT_KEY), 10);
+        if (isNaN(n)) return INITIAL_CREDIT;
+        return Math.max(0, Math.min(CREDIT_MAX, n));
+    }
+
+    function writeCredit(n) {
+        var v = Math.max(0, Math.min(CREDIT_MAX, parseInt(n, 10) || 0));
+        return lsSet(CREDIT_KEY, String(v));
+    }
+
+    function creditLevel(score) {
+        var s = Math.max(0, Math.min(CREDIT_MAX, parseInt(score, 10) || 0));
+        for (var i = 0; i < CREDIT_LEVELS.length; i++) {
+            if (s >= CREDIT_LEVELS[i].min) return CREDIT_LEVELS[i];
+        }
+        return CREDIT_LEVELS[CREDIT_LEVELS.length - 1];
+    }
+
+    function readLogs(key) {
+        try {
+            var arr = JSON.parse(lsGet(key) || '[]');
+            if (!Array.isArray(arr)) return [];
+            return arr.filter(function (item) {
+                return item && typeof item.time === 'number' && typeof item.delta === 'number';
+            });
+        } catch (err) { return []; }
+    }
+
+    function pushLog(key, entry) {
+        var list = readLogs(key);
+        list.unshift(entry);
+        if (list.length > LOG_MAX) list = list.slice(0, LOG_MAX);
+        return lsSet(key, JSON.stringify(list));
+    }
+
+    function addCredit(delta, reason) {
+        var next = Math.max(0, Math.min(CREDIT_MAX, readCredit() + delta));
+        if (!writeCredit(next)) return null;
+        pushLog(CREDIT_LOG_KEY, { time: Date.now(), delta: delta, reason: reason, after: next });
+        return next;
+    }
+
+    function formatTime(ts) {
+        var d = new Date(ts);
+        var two = function (n) { return n < 10 ? '0' + n : String(n); };
+        return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+            ' ' + two(d.getHours()) + ':' + two(d.getMinutes());
+    }
+
+    function renderLogList(boxId, key, emptyText) {
+        var box = document.getElementById(boxId);
+        if (!box) return;
+        var list = readLogs(key);
+        if (list.length === 0) {
+            box.innerHTML = '<p class="text-muted small mb-0">' + emptyText + '</p>';
+            return;
+        }
+        var html = '<ul class="list-unstyled mb-0">';
+        list.forEach(function (item) {
+            var up = item.delta > 0;
+            html += '<li class="d-flex justify-content-between align-items-start border-bottom py-2">' +
+                '<div class="me-2"><div class="small">' + esc(item.reason || '') + '</div>' +
+                '<div class="text-muted" style="font-size:.75rem">' + formatTime(item.time) + '</div></div>' +
+                '<span class="fw-bold text-nowrap ' + (up ? 'text-success' : 'text-danger') + '">' +
+                (up ? '+' : '') + item.delta + '</span></li>';
+        });
+        box.innerHTML = html + '</ul>';
+    }
+
+    function refreshCredit() {
+        var score = readCredit();
+        document.querySelectorAll('[data-credit]').forEach(function (el) {
+            el.textContent = score;
+        });
+        var bar = document.getElementById('credit-bar');
+        if (bar) {
+            bar.style.width = score + '%';
+            bar.className = 'progress-bar ' + creditLevel(score).badge;
+            var track = bar.parentNode;
+            if (track && track.setAttribute) {
+                track.setAttribute('aria-valuenow', String(score));
+            }
+        }
+    }
+
+    // 首页双分卡片：积分与信誉分各占一块，数值都由 localStorage 驱动
+    function renderScoreCards() {
+        var box = document.getElementById('score-cards');
+        if (!box) return;
+        var points = readPoints();
+        var credit = readCredit();
+        var level = creditLevel(credit);
+        var onboarded = lsGet(ONBOARD_KEY) === '1';
+
+        var html = '' +
+            '<div class="col-6">' +
+                '<div class="card h-100 shadow-sm border-0 rounded-4">' +
+                    '<div class="card-body p-3">' +
+                        '<div class="text-muted small">我的积分</div>' +
+                        '<div class="d-flex align-items-end gap-1">' +
+                            '<span class="display-5 fw-bold text-primary lh-1" data-points>' + points + '</span>' +
+                            '<span class="text-muted small mb-1">分</span>' +
+                        '</div>' +
+                        '<p class="text-muted small mb-0 mt-2">完成 +5 · 发布 -10</p>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="col-6">' +
+                '<div class="card h-100 shadow-sm border-0 rounded-4">' +
+                    '<div class="card-body p-3">' +
+                        '<div class="d-flex justify-content-between align-items-center">' +
+                            '<div class="text-muted small">我的信誉分</div>' +
+                            '<span id="credit-level" class="badge ' + level.badge + '">' + level.name + '</span>' +
+                        '</div>' +
+                        '<div class="d-flex align-items-end gap-1">' +
+                            '<span class="display-5 fw-bold lh-1" data-credit>' + credit + '</span>' +
+                            '<span class="text-muted small mb-1">/100</span>' +
+                        '</div>' +
+                        '<div class="progress mt-2" style="height:6px" role="progressbar" aria-label="信誉分" ' +
+                            'aria-valuenow="' + credit + '" aria-valuemin="0" aria-valuemax="100">' +
+                            '<div id="credit-bar" class="progress-bar ' + level.badge + '" style="width:' + credit + '%"></div>' +
+                        '</div>' +
+                        (onboarded
+                            ? '<a class="btn btn-sm btn-outline-primary w-100 mt-2" href="profile.html">查看记录</a>'
+                            : '<button type="button" class="btn btn-sm btn-success w-100 mt-2" ' +
+                              'onclick="claimOnboard()">新人任务 +40</button>') +
+                        '<p class="text-muted mb-0 mt-1" style="font-size:.72rem">' +
+                            (onboarded
+                                ? '信誉分 ≥40 可发布问卷'
+                                : '完成后信誉 +40，达到 40 才能发布') +
+                        '</p>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        box.innerHTML = html;
+    }
+
+    function renderProfileCredit() {
+        var scoreEl = document.getElementById('profile-credit');
+        if (!scoreEl) return;
+        var score = readCredit();
+        var level = creditLevel(score);
+        scoreEl.textContent = score;
+        var badge = document.getElementById('profile-credit-level');
+        if (badge) {
+            badge.textContent = level.name;
+            badge.className = 'badge ' + level.badge;
+        }
+        var bar = document.getElementById('profile-credit-bar');
+        if (bar) {
+            bar.style.width = score + '%';
+            bar.className = 'progress-bar ' + level.badge;
+        }
+        var onboardBtn = document.getElementById('onboard-btn');
+        if (onboardBtn) onboardBtn.classList.toggle('d-none', lsGet(ONBOARD_KEY) === '1');
+        renderLogList('credit-timeline', CREDIT_LOG_KEY, '还没有信誉分变动记录');
+        renderLogList('points-timeline', POINTS_LOG_KEY, '还没有积分变动记录');
+    }
+
+    function claimOnboard() {
+        if (lsGet(ONBOARD_KEY) === '1') return false;
+
+        var beforeCredit = readCredit();
+        var beforePoints = readPoints();
+        // 先把旧值存一份：任何一步写失败都整体回滚，避免“积分加了、任务没标记”
+        var backup = {
+            credit: lsGet(CREDIT_KEY),
+            points: lsGet(POINTS_KEY),
+            creditLog: lsGet(CREDIT_LOG_KEY),
+            pointsLog: lsGet(POINTS_LOG_KEY),
+            onboarded: lsGet(ONBOARD_KEY)
+        };
+
+        function rollback() {
+            lsRestore(CREDIT_KEY, backup.credit);
+            lsRestore(POINTS_KEY, backup.points);
+            lsRestore(CREDIT_LOG_KEY, backup.creditLog);
+            lsRestore(POINTS_LOG_KEY, backup.pointsLog);
+            lsRestore(ONBOARD_KEY, backup.onboarded);
+            refreshPoints();
+            refreshCredit();
+            renderScoreCards();
+            renderProfileCredit();
+        }
+
+        if (!writeCredit(beforeCredit + ONBOARD_CREDIT)) {
+            window.alert('信誉分保存失败，请重试');
+            return false;
+        }
+        if (!writePoints(beforePoints + ONBOARD_POINTS)) {
+            rollback();
+            window.alert('积分保存失败，请重试');
+            return false;
+        }
+
+        // 信誉分可能已经封顶，流水按“实际增加”记，避免 98→100 却写 +40
+        var afterCredit = readCredit();
+        var creditLogOk = true;
+        if (afterCredit !== beforeCredit) {
+            creditLogOk = pushLog(CREDIT_LOG_KEY, {
+                time: Date.now(),
+                delta: afterCredit - beforeCredit,
+                reason: '新人任务：阅读互助规则',
+                after: afterCredit
+            });
+        }
+        var pointsLogOk = pushLog(POINTS_LOG_KEY, {
+            time: Date.now(), delta: ONBOARD_POINTS, reason: '新人任务奖励', after: readPoints()
+        });
+
+        // onboarded 是防重复领取的关键，写入失败必须回滚，否则可以反复点
+        if (!creditLogOk || !pointsLogOk || !lsSet(ONBOARD_KEY, '1')) {
+            rollback();
+            window.alert('新人任务保存失败，请检查浏览器存储后重试');
+            return false;
+        }
+
+        refreshPoints();
+        refreshCredit();
+        renderScoreCards();
+        renderProfileCredit();
+        return true;
+    }
+
+    function demoPenalty() {
+        if (!window.confirm('演示用：模拟一次问卷逾期未回收，扣 20 信誉分？')) return false;
+        var next = addCredit(-20, '演示：问卷逾期未回收');
+        if (next === null) {
+            window.alert('信誉分保存失败，请重试');
+            return false;
+        }
+        refreshCredit();
+        renderScoreCards();
+        renderProfileCredit();
+        return true;
+    }
+
     // 按钮/链接变灰：详情页按钮、首页卡片都走这里
     function markDone(el) {
         if (el.classList.contains('btn-success')) {
@@ -645,6 +926,9 @@
 
     function syncAll() {
         refreshPoints();
+        refreshCredit();
+        renderScoreCards();
+        renderProfileCredit();
         renderSurveyList();
         syncDetailButton();
     }
@@ -865,6 +1149,14 @@
             window.alert('积分保存失败，请重试');
             return false;
         }
+        pushLog(POINTS_LOG_KEY, {
+            time: Date.now(), delta: surveyReward(survey), reason: '完成问卷：' + survey.title, after: readPoints()
+        });
+        if (writeCredit(readCredit() + REWARD)) {
+            pushLog(CREDIT_LOG_KEY, {
+                time: Date.now(), delta: REWARD, reason: '完成问卷：' + survey.title, after: readCredit()
+            });
+        }
         refreshPoints();
 
         if (btn) markDone(btn);
@@ -882,10 +1174,29 @@
     /* ---------------- 一键重置演示数据 ---------------- */
     // 只清积分和领取记录，保留用户发布的问卷，避免演示到一半把作品清空
     function resetDemoData() {
-        if (!window.confirm('确定要清空记录并恢复初始状态吗？')) return false;
+        if (!window.confirm('确定要清空积分、信誉分、领取记录与流水吗？已发布的问卷会保留。')) return false;
 
-        lsSet(POINTS_KEY, String(INITIAL_POINTS));
-        lsSet(CLAIMED_KEY, '[]');
+        var entries = [
+            [POINTS_KEY, String(INITIAL_POINTS)],
+            [CREDIT_KEY, String(INITIAL_CREDIT)],
+            [CLAIMED_KEY, '[]'],
+            [CREDIT_LOG_KEY, '[]'],
+            [POINTS_LOG_KEY, '[]'],
+            [ONBOARD_KEY, '0']
+        ];
+        var backup = entries.map(function (entry) { return lsGet(entry[0]); });
+
+        for (var i = 0; i < entries.length; i++) {
+            if (!lsSet(entries[i][0], entries[i][1])) {
+                // 重置要么全成功、要么全不动，避免只清了一半
+                for (var j = 0; j <= i; j++) {
+                    lsRestore(entries[j][0], backup[j]);
+                }
+                window.alert('重置失败：浏览器本地存储不可用，请检查后重试');
+                return false;
+            }
+        }
+
         window.location.reload();
         return true;
     }
@@ -893,7 +1204,11 @@
     /* ---------------- 初始化 ---------------- */
     function init() {
         readPoints();      // 首次进入写入初始 50
+        readCredit();      // 首次进入写入初始信誉分 0
         refreshPoints();
+        refreshCredit();
+        renderScoreCards();
+        renderProfileCredit();
         renderDetail();    // 仅详情页生效
         var body = document.getElementById('q-body');
         if (body) body.addEventListener('change', onAnswerChange);
@@ -903,6 +1218,8 @@
     // 暴露给 HTML 的 onclick
     window.claimPoints = claimPoints;
     window.resetDemoData = resetDemoData;
+    window.claimOnboard = claimOnboard;
+    window.demoPenalty = demoPenalty;
 
     // 发布页与其他页面统一走这个接口
     var store = {
@@ -917,8 +1234,16 @@
         reward: REWARD,
         publishCost: PUBLISH_COST,
         getUser: function () {
-            return { score: readPoints() };
-        }
+            var credit = readCredit();
+            return {
+                score: readPoints(),
+                credit: credit,
+                level: creditLevel(credit).name,
+                onboarded: lsGet(ONBOARD_KEY) === '1'
+            };
+        },
+        getCredit: readCredit,
+        onboard: claimOnboard
     };
 
     Object.defineProperty(store, 'points', {
@@ -937,7 +1262,9 @@
     // 跨标签页同步：发布页写入后，已打开的首页会自动刷新出新卡片
     window.addEventListener('storage', function (e) {
         if (e.key === null || e.key === POINTS_KEY ||
-            e.key === CLAIMED_KEY || e.key === SURVEYS_KEY) {
+            e.key === CLAIMED_KEY || e.key === SURVEYS_KEY ||
+            e.key === CREDIT_KEY || e.key === CREDIT_LOG_KEY ||
+            e.key === POINTS_LOG_KEY || e.key === ONBOARD_KEY) {
             syncAll();
         }
     });

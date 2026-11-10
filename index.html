@@ -27,6 +27,20 @@
 
     <!-- 主体内容区 -->
     <div class="container mt-4 mb-5 pb-5">
+        <!-- 积分 / 信誉分双卡片：由 app.js 渲染，数值随 localStorage 实时更新 -->
+        <div class="row g-3 mb-3" id="score-cards"></div>
+
+        <!-- 适用边界：学术诚信声明（醒目提示，演示与答辩时都能看到） -->
+        <div class="alert alert-warning border-0 border-start border-4 border-warning shadow-sm mb-4" role="alert">
+            <div class="d-flex gap-2">
+                <span class="fs-5 lh-1">⚖️</span>
+                <div>
+                    <div class="fw-bold mb-1">适用边界（学术诚信声明）</div>
+                    <div class="small mb-0">本系统用于课程作业、科创训练等教学场景，不宣称样本代表性，不替代概率抽样与正规样本服务；本演示版暂不提供数据导出，涉及毕业论文或拟发表成果的研究，请另行采用规范抽样并如实说明样本来源。</div>
+                </div>
+            </div>
+        </div>
+
         <h4 class="mb-3">最新问卷</h4>
 
         <!-- 问卷列表：由 js/app.js 从 localStorage 渲染（内置问卷 + 用户自己发布的） -->

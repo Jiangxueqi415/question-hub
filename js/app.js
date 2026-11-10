@@ -12,10 +12,19 @@
  *       publisher: "我",              // 可省略，默认“我”
  *       category: "学习",             // 可省略，默认“其他”
  *       minutes: 3,                   // 可省略，默认 3
- *       questions: [{ q: "题目", options: ["选项A", "选项B"] }]
+ *       cover: "",                    // 可选：压缩后的封面 data URL
+ *       questions: [{
+ *           q: "题目",
+ *           type: "single",           // single | multiple，缺省 single
+ *           options: ["选项A", "选项B"],
+ *           answer: "A"               // 可选：正确答案字母
+ *       }]
  *   });
  *   if (!res.ok) { alert(res.error); return; }
  *   location.href = "detail.html?id=" + encodeURIComponent(res.id);
+ *
+ * 发布后问卷 locked:true；发布者可调用 SurveyStore.update(id, payload) 修改，
+ * 填写者在详情页只读，无权修改题目。
  * ============================================================ */
 (function () {
     'use strict';
@@ -31,6 +40,7 @@
     var MAX_TITLE_LEN = 40;
     var MAX_Q_LEN = 100;
     var MAX_OPTION_LEN = 50;
+    var COVER_MAX_LEN = 450000;  // 封面素材压缩后的 data URL 上限，避免撑爆 localStorage
     var CATEGORIES = ['学习', '生活', '调研', '其他'];
 
     /* ---------------- 内置问卷（演示用，不属于用户发布） ---------------- */
@@ -136,7 +146,16 @@
                     }
                     if (!q) continue;
                     if (clean.length < 2) continue;
-                    questions.push({ q: q, options: clean.slice(0, MAX_OPTIONS) });
+
+                    var finalOptions = clean.slice(0, MAX_OPTIONS);
+                    var type = normalizeQuestionType(item.type);
+                    var answer = normalizeAnswerList(item.answer, finalOptions.length, type, i + 1);
+                    questions.push({
+                        q: q,
+                        type: type,
+                        options: finalOptions,
+                        answer: answer.error ? [] : answer.value
+                    });
                 }
                 if (questions.length === 0) return;
 
@@ -150,6 +169,8 @@
                     reward: REWARD,
                     createdAt: parseInt(s.createdAt, 10) || 0,
                     mine: true,
+                    locked: true,
+                    cover: normalizeCover(s.cover),
                     questions: questions
                 });
             });
@@ -180,6 +201,66 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    // 封面素材：只接受前端压缩后的图片 data URL；超长/格式不对就丢弃
+    function normalizeCover(value) {
+        if (typeof value !== 'string' || !value) return '';
+        if (value.length > COVER_MAX_LEN) return '';
+        if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)) return '';
+        return value;
+    }
+
+    // 正确答案：对外存选项下标数组；同时兼容页面传来的 "A,C" 文本
+    function normalizeAnswerList(raw, optionCount, type, questionNo) {
+        if (raw == null || raw === '') return { value: [] };
+
+        var parts;
+        if (Array.isArray(raw)) {
+            parts = raw.slice();
+        } else if (typeof raw === 'string') {
+            parts = raw.split(/[,\uFF0C\u3001\s]+/).filter(function (part) {
+                return part !== '';
+            });
+        } else {
+            return { error: '第 ' + questionNo + ' 题的正确答案格式不正确，请填写选项字母（如 A）' };
+        }
+
+        if (parts.length === 0) return { value: [] };
+
+        var answer = [];
+        for (var i = 0; i < parts.length; i++) {
+            var part = parts[i];
+            var index = -1;
+
+            if (typeof part === 'number') {
+                index = part;
+            } else {
+                var token = String(part).trim();
+                if (/^[A-Fa-f]$/.test(token)) {
+                    index = token.toUpperCase().charCodeAt(0) - 65;
+                } else if (/^\d+$/.test(token)) {
+                    index = parseInt(token, 10) - 1;
+                } else {
+                    return { error: '第 ' + questionNo + ' 题的正确答案格式不正确，请填写选项字母（如 A）' };
+                }
+            }
+
+            if (!isFinite(index) || Math.floor(index) !== index || index < 0 || index >= optionCount) {
+                return { error: '第 ' + questionNo + ' 题的正确答案超出选项范围' };
+            }
+            if (answer.indexOf(index) === -1) answer.push(index);
+        }
+
+        if (type !== 'multiple' && answer.length > 1) {
+            return { error: '第 ' + questionNo + ' 题是单选题，只能设置 1 个正确答案' };
+        }
+
+        return { value: answer };
+    }
+
+    function normalizeQuestionType(value) {
+        return value === 'multiple' ? 'multiple' : 'single';
     }
 
     // 校验并清洗题目；返回 { questions: [...] } 或 { error: "..." }
@@ -222,7 +303,16 @@
                 return { error: '第 ' + (i + 1) + ' 题最多 ' + MAX_OPTIONS + ' 个选项' };
             }
 
-            out.push({ q: q, options: clean });
+            var type = normalizeQuestionType(item.type);
+            var answer = normalizeAnswerList(item.answer, clean.length, type, i + 1);
+            if (answer.error) return { error: answer.error };
+
+            out.push({
+                q: q,
+                type: type,
+                options: clean,
+                answer: answer.value
+            });
         }
         return { questions: out };
     }
@@ -268,6 +358,8 @@
             reward: REWARD,          // 奖励固定，忽略调用方传入的 reward，避免刷分
             createdAt: Date.now(),
             mine: true,
+            locked: true,
+            cover: normalizeCover(data.cover),
             questions: checked.questions
         };
 
@@ -286,6 +378,69 @@
         renderSurveyList();          // 若发布页没有列表容器，这里自动跳过
         refreshPoints();
         return { ok: true, id: survey.id, points: readPoints() };
+    }
+
+    // 发布者编辑：只处理自己发布的问卷；问卷锁定不阻止发布者修改
+    function updateSurvey(id, payload) {
+        var key = String(id == null ? '' : id);
+        var data = payload || {};
+        var list = readSurveys();
+        var index = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (String(list[i].id) === key) {
+                index = i;
+                break;
+            }
+        }
+        if (index === -1) {
+            return { ok: false, code: 'NOT_FOUND', error: '问卷不存在，无法编辑' };
+        }
+
+        var title = String(data.title == null ? '' : data.title).trim();
+        if (!title) return { ok: false, error: '请填写问卷标题' };
+        if (title.length > MAX_TITLE_LEN) {
+            return { ok: false, error: '标题最多 ' + MAX_TITLE_LEN + ' 个字' };
+        }
+
+        var publisher = String(data.publisher == null ? '' : data.publisher).trim() || '我';
+        if (publisher.length > 20) publisher = publisher.slice(0, 20);
+
+        var category = CATEGORIES.indexOf(data.category) !== -1 ? data.category : '其他';
+
+        var minutes = parseInt(data.minutes, 10);
+        if (isNaN(minutes) || minutes < 1) minutes = 3;
+        if (minutes > 60) minutes = 60;
+
+        var checked = normalizeQuestions(data.questions);
+        if (checked.error) return { ok: false, error: checked.error };
+
+        var original = list[index];
+        var updated = {
+            id: original.id,
+            title: title,
+            publisher: publisher,
+            category: category,
+            minutes: minutes,
+            reward: REWARD,
+            createdAt: original.createdAt,
+            mine: true,
+            locked: true,
+            cover: data.cover !== undefined ? normalizeCover(data.cover) : original.cover,
+            questions: checked.questions
+        };
+
+        list[index] = updated;
+        if (!writeSurveys(list)) {
+            return {
+                ok: false,
+                code: 'STORAGE_ERROR',
+                error: '本地存储不可用，修改没有保存，请检查浏览器设置'
+            };
+        }
+
+        renderSurveyList();
+        refreshPoints();
+        return { ok: true, id: original.id, survey: updated };
     }
 
     function removeSurvey(id) {
@@ -506,6 +661,8 @@
             body.innerHTML = '<div class="alert alert-warning mb-0">' +
                 '没有找到这份问卷，请返回首页重新选择。</div>';
         }
+        var answers = document.getElementById('q-answers');
+        if (answers) answers.innerHTML = '';
     }
 
     function renderDetail() {
@@ -524,22 +681,76 @@
         if (title) title.textContent = survey.title;
         if (meta) meta.textContent = surveyMeta(survey);
 
-        var html = '';
+        var html = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
+            '<span class="badge bg-warning text-dark">🔒 已锁定</span>';
+        if (survey.mine) {
+            html += '<a class="btn btn-sm btn-outline-primary" href="publish.html?edit=' +
+                encodeURIComponent(survey.id) + '">编辑问卷</a>';
+        }
+        html += '</div>';
+        html += '<p class="small text-muted mb-3">本问卷已锁定：发布者可修改题目，填写者无权更改。</p>';
+
+        if (survey.cover) {
+            html += '<img class="survey-cover" src="' + survey.cover + '" alt="问卷封面素材">';
+        }
+
         survey.questions.forEach(function (item, qi) {
             var name = 'q' + (qi + 1);
+            var type = item.type === 'multiple' ? 'multiple' : 'single';
             html += '<div class="mb-3">';
-            html += '<p class="fw-semibold mb-2">' + (qi + 1) + '. ' + esc(item.q) + '</p>';
+            html += '<p class="fw-semibold mb-2">' + (qi + 1) + '. ' + esc(item.q) +
+                ' <span class="badge bg-light text-secondary border">' +
+                (type === 'multiple' ? '多选' : '单选') + '</span></p>';
             item.options.forEach(function (opt, oi) {
                 var id = name + '_' + oi;
                 html += '<div class="form-check">';
-                html += '<input class="form-check-input" type="radio" name="' + name +
-                    '" id="' + id + '" value="' + oi + '">';
-                html += '<label class="form-check-label" for="' + id + '">' + esc(opt) + '</label>';
+                html += '<input class="form-check-input" type="' +
+                    (type === 'multiple' ? 'checkbox' : 'radio') +
+                    '" name="' + name + '" id="' + id + '" value="' + oi + '">';
+                html += '<label class="form-check-label" for="' + id + '">' +
+                    String.fromCharCode(65 + oi) + '. ' + esc(opt) + '</label>';
                 html += '</div>';
             });
             html += '</div>';
         });
         body.innerHTML = html;
+        renderAnswerKey(survey);
+    }
+
+    // 领取后展示参考答案；容器放在按钮后面，局部更新即可
+    function renderAnswerKey(survey) {
+        var body = document.getElementById('q-body');
+        if (!body || !survey) return;
+
+        var box = document.getElementById('q-answers');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'q-answers';
+            box.className = 'mt-3';
+            body.parentNode.appendChild(box);
+        }
+
+        if (!isClaimed(survey.id)) {
+            box.innerHTML = '';
+            return;
+        }
+
+        var html = '';
+        survey.questions.forEach(function (item, qi) {
+            if (!Array.isArray(item.answer) || item.answer.length === 0) return;
+            var labels = item.answer.map(function (ai) {
+                return String.fromCharCode(65 + ai) + '. ' + (item.options[ai] || '');
+            }).join('；');
+            html += '<div class="small mb-1">第 ' + (qi + 1) + ' 题：' + esc(labels) + '</div>';
+        });
+
+        if (!html) {
+            box.innerHTML = '';
+            return;
+        }
+
+        box.innerHTML = '<div class="alert alert-success mb-0">' +
+            '<div class="fw-semibold mb-1">参考答案</div>' + html + '</div>';
     }
 
     /* ---------------- 表单校验：必须答完所有题 ---------------- */
@@ -663,6 +874,8 @@
             tip.textContent = '积分 +' + surveyReward(survey) + ' 成功！当前共 ' + readPoints() + ' 分';
             tip.style.display = 'block';
         }
+
+        renderAnswerKey(survey);
         return true;
     }
 
@@ -692,8 +905,9 @@
     window.resetDemoData = resetDemoData;
 
     // 发布页与其他页面统一走这个接口
-    window.SurveyStore = {
+    var store = {
         create: createSurvey,
+        update: updateSurvey,
         remove: removeSurvey,
         get: getSurveyById,
         list: getAllSurveys,
@@ -703,6 +917,13 @@
         reward: REWARD,
         publishCost: PUBLISH_COST
     };
+
+    Object.defineProperty(store, 'points', {
+        get: readPoints,
+        enumerable: true
+    });
+
+    window.SurveyStore = store;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

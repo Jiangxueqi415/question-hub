@@ -29,7 +29,41 @@
 	<div class="container pb-5 mt-3">
     <div class="card mb-4">
         <div class="card-body">
-            <h4>我的积分：<span id="profile-points">50</span></h4>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-muted small">我的积分</div>
+                    <h4 class="mb-0"><span id="profile-points">50</span> 分</h4>
+                </div>
+                <div class="text-end">
+                    <div class="text-muted small">信誉分</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fs-4 fw-bold" id="profile-credit">0</span>
+                        <span class="badge bg-secondary" id="profile-credit-level">较差</span>
+                    </div>
+                </div>
+            </div>
+            <div class="progress mt-3" style="height:8px">
+                <div class="progress-bar bg-secondary" id="profile-credit-bar" style="width:0%"></div>
+            </div>
+            <p class="text-muted small mb-0 mt-2">信誉分 ≥40 才能发布问卷；完成他人问卷 +5，新人任务 +40。</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">信誉分记录</h6>
+                <div class="d-flex gap-2">
+                    <button id="onboard-btn" type="button" class="btn btn-sm btn-success"
+                            onclick="claimOnboard()">新人任务 +40</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            onclick="demoPenalty()">演示：逾期 -20</button>
+                </div>
+            </div>
+            <div id="credit-timeline"></div>
+            <hr>
+            <h6 class="mb-2">积分记录</h6>
+            <div id="points-timeline"></div>
         </div>
     </div>
 

@@ -14,7 +14,7 @@
         <div class="container">
             <a class="navbar-brand mb-0 h1" href="index.html">问卷互助</a>
             <div class="d-flex align-items-center gap-2">
-                <span class="text-white fw-bold small text-nowrap">当前积分: <span id="top-points" data-points>50</span> 分</span>
+                <span class="text-white fw-bold small text-nowrap">当前积分: <span id="top-points" data-points>0</span> 分</span>
                 <button type="button" class="btn btn-sm btn-light text-primary text-nowrap"
                         onclick="resetDemoData()">重置演示</button>
             </div>
@@ -27,14 +27,14 @@
         <div id="edit-banner" class="alert alert-info d-none" role="status"></div>
 
         <form id="publish-form" novalidate>
-            <!-- 发布者 / 题目数量 / 预计耗时 / 分类：位于表单左上角 -->
+            <!-- 发布者 / 题目数量 / 耗时 / 分类 / 作答时间窗：表单顶部 -->
             <div class="card border-0 shadow-sm publish-panel mb-4">
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-6 col-md-3">
                             <label for="publisher" class="form-label small fw-semibold">发布者</label>
-                            <input type="text" class="form-control" id="publisher" maxlength="20"
-                                   placeholder="自动使用当前用户" autocomplete="nickname">
+                            <input type="text" class="form-control" id="publisher" value="匿名同学"
+                                   readonly aria-readonly="true">
                         </div>
                         <div class="col-6 col-md-2">
                             <label for="question-count" class="form-label small fw-semibold">题目数量</label>
@@ -51,7 +51,19 @@
                             <select class="form-select" id="category"></select>
                         </div>
                     </div>
-                    <p class="form-text mt-2 mb-0">发布者按当前用户信息自动填入；数字输入框不接受负数。</p>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <label for="start-at" class="form-label small fw-semibold">开始日期</label>
+                            <input type="datetime-local" class="form-control" id="start-at">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <label for="end-at" class="form-label small fw-semibold">截至日期</label>
+                            <input type="datetime-local" class="form-control" id="end-at">
+                        </div>
+                    </div>
+                    <p class="form-text mt-2 mb-0" id="publish-rule-hint">
+                        发布者统一显示为“匿名同学”，不会采集真实姓名。
+                    </p>
                 </div>
             </div>
 
@@ -61,8 +73,8 @@
                     <div class="card-body">
                         <label for="title" class="form-label fw-semibold">问卷标题</label>
                         <input type="text" class="form-control publish-title-input" id="title"
-                               maxlength="20" placeholder="请输入问卷标题（最多 20 字）" autocomplete="off">
-                        <div class="text-end small text-muted mt-1"><span id="title-count">0</span>/20</div>
+                               maxlength="40" placeholder="请输入问卷标题（最多 40 字）" autocomplete="off">
+                        <div class="text-end small text-muted mt-1"><span id="title-count">0</span>/40</div>
                     </div>
                 </div>
 
@@ -95,7 +107,7 @@
                 <div class="alert alert-warning d-none" id="points-hint"></div>
 
                 <p class="small text-muted text-center mb-0">
-                    发布即锁定：锁定后发布者仍可修改题目，参与填写者无权更改。
+                    发布即锁定：填写者提交后不可更改答案；作答统计仅发布者可见。
                 </p>
             </div>
         </form>
@@ -119,6 +131,7 @@
                         <select class="form-select form-select-sm publish-type-select question-type" aria-label="题型">
                             <option value="single">单选</option>
                             <option value="multiple">多选</option>
+                            <option value="open">开放题</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-question">删除题目</button>
                     </div>
@@ -126,17 +139,16 @@
                 <label class="form-label small text-muted">题目</label>
                 <input type="text" class="form-control question-text" maxlength="100"
                        placeholder="请输入题目内容（最多 100 字）">
-                <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
-                    <span class="form-label small text-muted mb-0">选项</span>
-                    <span class="small text-muted">2-6 个，不能重复</span>
+                <div class="options-block mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="form-label small text-muted mb-0">选项</span>
+                        <span class="small text-muted">2-6 个，不能重复</span>
+                    </div>
+                    <div class="options"></div>
+                    <button type="button" class="btn btn-sm btn-link px-0 add-option">＋ 添加选项</button>
                 </div>
-                <div class="options"></div>
-                <button type="button" class="btn btn-sm btn-link px-0 add-option">＋ 添加选项</button>
-                <div class="publish-answer-box mt-2">
-                    <label class="form-label small fw-semibold mb-1">正确答案（选填）</label>
-                    <input type="text" class="form-control answer-input" maxlength="23"
-                           placeholder="如：A（只能填 1 个）">
-                    <div class="form-text">按选项字母填写，多选可填多个，如 A,C；提交后展示参考答案。</div>
+                <div class="publish-open-hint open-question-hint d-none mt-2">
+                    开放题无需设置选项，作答者最多输入 100 字。
                 </div>
             </div>
         </div>
@@ -145,7 +157,7 @@
     <template id="option-template">
         <div class="d-flex align-items-center gap-2 mb-2 publish-option-row option-row">
             <span class="publish-option-letter option-letter">A</span>
-            <input type="text" class="form-control option-input" maxlength="50" placeholder="请输入选项内容">
+            <input type="text" class="form-control option-input" maxlength="50" aria-label="选项内容">
             <button type="button" class="btn btn-outline-danger remove-option" aria-label="删除选项">×</button>
         </div>
     </template>

@@ -56,8 +56,7 @@
                 <div class="d-flex gap-2">
                     <button id="onboard-btn" type="button" class="btn btn-sm btn-success"
                             onclick="claimOnboard()">新人任务 +40</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger"
-                            onclick="demoPenalty()">演示：逾期 -20</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="demoBtn" onclick="demoPenalty()">演示：逾期 -20</button>
                 </div>
             </div>
             <div id="credit-timeline"></div>
@@ -135,6 +134,7 @@ function delSurvey(id){
   if(confirm('确定要删除这份问卷吗？')){
     window.SurveyStore.remove(id);
     renderMyPublish();
+    renderMyHistory();
   }
 }
 window.addEventListener('load',function(){
@@ -144,5 +144,14 @@ window.addEventListener('load',function(){
   document.getElementById('profile-points').innerText = userInfo.score;
 })
 </script>
+    <script>
+        // P-08: 如果网址没有 ?demo=1，就隐藏演示按钮
+        if (!window.location.search.includes('demo=1')) {
+            var dBtn = document.getElementById('demoBtn');
+            if (dBtn) {
+                dBtn.style.display = 'none';
+            }
+        }
+    </script>
 </body>
 </html>

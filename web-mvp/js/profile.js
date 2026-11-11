@@ -238,14 +238,23 @@
             var meta = document.createElement('div');
             meta.className = 'text-muted';
             meta.style.fontSize = '.75rem';
-            meta.textContent = '获得 ' + item.reward + ' 积分 · 填写时间：' +
-                (item.time ? formatDateTime(item.time) : '—');
+            if (item.status === 'expired') {
+                meta.textContent = '已过期 · 未获得积分 · 记录时间：' +
+                    (item.time ? formatDateTime(item.time) : '—');
+                title.className += ' text-muted';
+            } else if (item.status === 'incomplete') {
+                meta.textContent = '未答完 · 未获得积分 · 信誉分 -5 · 记录时间：' +
+                    (item.time ? formatDateTime(item.time) : '—');
+            } else {
+                meta.textContent = '获得 ' + item.reward + ' 积分 · 填写时间：' +
+                    (item.time ? formatDateTime(item.time) : '—');
+            }
             left.appendChild(meta);
 
             row.appendChild(left);
 
-            if (item.exists) {
-                row.appendChild(actionLink('查看', 'detail.html?id=' + encodeURIComponent(item.id),
+            if (item.exists && item.status !== 'expired') {
+                row.appendChild(actionLink('查看作答', 'detail.html?id=' + encodeURIComponent(item.id),
                     'small text-decoration-none text-nowrap'));
             }
 
@@ -254,6 +263,8 @@
     }
 
     function renderAll() {
+        // 每次渲染前清理超过 7 天的填写记录，再读 history
+        if (Store.cleanupClaimed) Store.cleanupClaimed();
         renderMyPublish();
         renderMyHistory();
     }
@@ -264,11 +275,42 @@
         demoBtn.classList.toggle('d-none', window.location.search.indexOf('demo=1') === -1);
     }
 
+    // 昵称：发布问卷时统一用作发布者显示名
+    var nicknameInput = document.getElementById('nickname-input');
+    var nicknameSave = document.getElementById('nickname-save');
+    var nicknameTip = document.getElementById('nickname-tip');
+
+    function fillNickname() {
+        if (nicknameInput && Store.getNickname) nicknameInput.value = Store.getNickname();
+    }
+
+    function saveNickname() {
+        if (!nicknameInput || !Store.setNickname) return;
+        if (!Store.setNickname(nicknameInput.value)) {
+            window.alert('昵称不能为空，或本地存储不可用');
+            return;
+        }
+        fillNickname();
+        if (nicknameTip) {
+            nicknameTip.textContent = '已保存';
+            window.setTimeout(function () { nicknameTip.textContent = ''; }, 2000);
+        }
+    }
+
+    if (nicknameSave) nicknameSave.addEventListener('click', saveNickname);
+    if (nicknameInput) {
+        nicknameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') saveNickname();
+        });
+        fillNickname();
+    }
+
     // 多标签页同步：发布 / 作答 / 删除后刷新统计与记录
     window.addEventListener('storage', function (e) {
         if (e.key === null || e.key === 'surveys' || e.key === 'claimed' ||
             e.key === 'responses' || e.key === 'attempts' ||
-            e.key === 'points' || e.key === 'credit') {
+            e.key === 'points' || e.key === 'credit' || e.key === 'nickname') {
+            if (e.key === 'nickname') fillNickname();
             renderAll();
         }
     });

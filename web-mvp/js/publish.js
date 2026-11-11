@@ -362,7 +362,7 @@
     function collectPayload() {
         return {
             title: titleInput.value.trim(),
-            publisher: '匿名同学',
+            publisher: Store.getNickname ? Store.getNickname() : '',
             category: categorySelect.value,
             minutes: minutesInput.value,
             startAt: parseDateInput(startInput),
@@ -378,7 +378,7 @@
         hideError();
         titleInput.value = survey.title;
         updateTitleCount();
-        publisherInput.value = '匿名同学';
+        publisherInput.value = Store.getNickname ? Store.getNickname() : '';
         categorySelect.value = survey.category;
         minutesInput.value = String(survey.minutes);
         startInput.value = formatDateTimeValue(survey.startAt || defaultStartAt());
@@ -398,7 +398,7 @@
         hideError();
         titleInput.value = '';
         updateTitleCount();
-        publisherInput.value = '匿名同学';
+        publisherInput.value = Store.getNickname ? Store.getNickname() : '';
         categorySelect.value = '其他';
         minutesInput.value = '3';
         startInput.value = formatDateTimeValue(defaultStartAt());
@@ -427,7 +427,7 @@
             return;
         }
         var user = Store.getUser ? Store.getUser() : null;
-        ruleHint.textContent = '发布者统一显示为“匿名同学”，不会采集真实姓名；当前积分 ' +
+        ruleHint.textContent = '当前积分 ' +
             Store.points + ' 分、信誉分 ' + Store.getCredit() + ' 分，发布需信誉分 ≥ ' +
             Store.creditMin + ' 且消耗 ' + Store.publishCost + ' 积分。' +
             (user && !user.onboarded ? ' 首次使用可先在“我的”完成新人任务。' : '');
@@ -477,7 +477,7 @@
     });
     categorySelect.value = '其他';
 
-    publisherInput.value = '匿名同学';
+    publisherInput.value = Store.getNickname ? Store.getNickname() : '';
     publisherInput.readOnly = true;
     titleInput.addEventListener('input', updateTitleCount);
     categorySelect.addEventListener('change', applyQuestionPlaceholders);
@@ -495,7 +495,7 @@
         submitBtn.textContent = '保存修改';
         populateForm(editingSurvey);
     } else {
-        publisherInput.value = '匿名同学';
+        publisherInput.value = Store.getNickname ? Store.getNickname() : '';
         minutesInput.value = '3';
         startInput.value = formatDateTimeValue(defaultStartAt());
         endInput.value = formatDateTimeValue(defaultEndAt());

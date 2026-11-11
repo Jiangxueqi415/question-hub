@@ -4,7 +4,7 @@
  * localStorage:
  *   points     当前积分，初始 0
  *   credit     当前信誉分，初始 0；发布问答需 ≥ 40
- *   claimed    已领取的问卷 id 数组，例如 ["1","2"]
+ *   claimed    已领取记录，例如 [{ id:"1", time:1699999999999 }]
  *   surveys    用户发布的问卷数组（发布页只负责调用下面的接口）
  *   responses  作答记录，用于发布者统计与个人中心整理
  *   attempts   已开始但未提交的作答，用于逾期扣信誉分
@@ -36,7 +36,10 @@
 
     var POINTS_KEY = 'points';
     var CREDIT_KEY = 'credit';
+    var NICKNAME_KEY = 'nickname'; // 发布者展示名；不采集真实姓名
+    var DEFAULT_NICKNAME = '校园用户';
     var CLAIMED_KEY = 'claimed';
+    var LOCKED_KEY = 'lockedClaims'; // 7 天清理后仍保留的“不可重复领取”锁，只存 id/状态，不展示
     var SURVEYS_KEY = 'surveys';
     var RESPONSES_KEY = 'responses';
     var ATTEMPTS_KEY = 'attempts';
@@ -51,8 +54,12 @@
     var CREDIT_MAX = 100;
     var CREDIT_PUBLISH_MIN = 40;
     var ONBOARD_CREDIT = 40;
-    var ONBOARD_POINTS = 10;
+    var ONBOARD_POINTS = 0;      // 新人任务只送信誉分；积分必须靠完成他人问卷获得
     var PENALTY_CREDIT = 20;     // 逾期未完成作答扣除的信誉分
+    var CLAIM_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 填写记录保留 7 天
+    var MIN_ANSWER_SECONDS = 3;  // 少于 3 秒视为疑似刷分
+    var claimStartTime = 0;      // 详情页开始作答的时间
+    var timerInterval = null;    // 详情页计时器
     var MAX_QUESTIONS = 10;      // 单份问卷最多题数
     var MAX_OPTIONS = 6;         // 每题最多选项数
     var MAX_TITLE_LEN = 40;
@@ -70,9 +77,28 @@
     ];
 
     /* ---------------- 内置问卷（演示用，不属于用户发布） ---------------- */
-    // 内置演示问卷也带滚动时间窗，保证答题页始终能看到截止提示
-    var DEMO_START_AT = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    var DEMO_END_AT = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    // 内置演示问卷的时间窗只在首次运行时生成一次，之后固定不变，
+    // 避免刷新页面就把截止日期往后推、真实逾期永远触发不了。
+    var DEMO_DATES_KEY = 'demoDates';
+    function readDemoDates() {
+        var fallback = {
+            startAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+            endAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+        };
+        try {
+            var saved = JSON.parse(window.localStorage.getItem(DEMO_DATES_KEY));
+            if (saved && isFinite(saved.startAt) && isFinite(saved.endAt) && saved.endAt > saved.startAt) {
+                return { startAt: Number(saved.startAt), endAt: Number(saved.endAt) };
+            }
+        } catch (err) { /* 忽略损坏数据，重新生成 */ }
+        try {
+            window.localStorage.setItem(DEMO_DATES_KEY, JSON.stringify(fallback));
+        } catch (err) { /* 存储不可用时退化为本次页面内固定 */ }
+        return fallback;
+    }
+    var DEMO_DATES = readDemoDates();
+    var DEMO_START_AT = DEMO_DATES.startAt;
+    var DEMO_END_AT = DEMO_DATES.endAt;
 
     var SURVEYS = {
         '1': {
@@ -147,11 +173,47 @@
         return lsSet(POINTS_KEY, String(n));
     }
 
-    // 数据被手动改坏时不抛错，返回空数组，避免整个页面 JS 卡死
+    // 发布者昵称：仅用于展示，不采集真实姓名；空值回落到默认昵称
+    function readNickname() {
+        var raw = lsGet(NICKNAME_KEY);
+        var value = String(raw == null ? '' : raw).trim();
+        if (!value) return DEFAULT_NICKNAME;
+        return value.slice(0, 20);
+    }
+
+    function writeNickname(value) {
+        var name = String(value == null ? '' : value).trim();
+        if (!name) return false;
+        return lsSet(NICKNAME_KEY, name.slice(0, 20));
+    }
+
+    // 兼容旧版字符串数组；读取时统一归一化为 { id, time }
     function readClaimed() {
         try {
             var arr = JSON.parse(lsGet(CLAIMED_KEY) || '[]');
-            return Array.isArray(arr) ? arr.map(String) : [];
+            if (!Array.isArray(arr)) return [];
+
+            var changed = false;
+            var out = [];
+            arr.forEach(function (item) {
+                if (item && typeof item === 'object' && item.id != null) {
+                    var record = {
+                        id: String(item.id),
+                        time: parseInt(item.time, 10) || 0
+                    };
+                    if (item.status) record.status = String(item.status);
+                    if (item.reason) record.reason = String(item.reason);
+                    // 个人中心展示“我填过的选项”；旧记录没有该字段时回退到 responses
+                    if (Array.isArray(item.answers)) record.answers = item.answers;
+                    out.push(record);
+                } else if (item !== null && item !== undefined) {
+                    // 旧格式 ["1","2"]：迁移时以当前时间作为记录时间
+                    out.push({ id: String(item), time: Date.now() });
+                    changed = true;
+                }
+            });
+            if (changed) writeClaimed(out);
+            return out;
         } catch (err) {
             return [];
         }
@@ -161,8 +223,98 @@
         return lsSet(CLAIMED_KEY, JSON.stringify(arr));
     }
 
+    // 只保留 id / 状态，不保留时间；用于 7 天清理后继续阻止重复领取
+    function readLockedClaims() {
+        try {
+            var arr = JSON.parse(lsGet(LOCKED_KEY) || '[]');
+            if (!Array.isArray(arr)) return [];
+            var out = [];
+            arr.forEach(function (item) {
+                if (item && typeof item === 'object' && item.id != null) {
+                    out.push({
+                        id: String(item.id),
+                        status: item.status === 'expired' ? 'expired' : 'done'
+                    });
+                } else if (item !== null && item !== undefined) {
+                    out.push({ id: String(item), status: 'done' });
+                }
+            });
+            return out;
+        } catch (err) {
+            return [];
+        }
+    }
+
+    function writeLockedClaims(arr) {
+        return lsSet(LOCKED_KEY, JSON.stringify(arr));
+    }
+
+    // 把即将被 7 天清理的记录转成永久锁；写失败就不清理，避免失去防重复
+    function rememberLockedClaims(items) {
+        if (!items.length) return true;
+        var locked = readLockedClaims();
+        items.forEach(function (item) {
+            var exists = locked.some(function (row) { return row.id === item.id; });
+            if (!exists) {
+                locked.push({
+                    id: String(item.id),
+                    status: item.status === 'expired' ? 'expired' : 'done'
+                });
+            }
+        });
+        return writeLockedClaims(locked);
+    }
+
+    // 清理超过 7 天的填写记录（只清展示记录，保留防重复锁），返回被移除的条数
+    function cleanupClaimed() {
+        var list = readClaimed();
+        var now = Date.now();
+        var kept = [];
+        var removed = [];
+        list.forEach(function (item) {
+            if (item.time && now - item.time <= CLAIM_RETENTION_MS) {
+                kept.push(item);
+            } else {
+                removed.push(item);
+            }
+        });
+        if (removed.length === 0) return 0;
+        if (!rememberLockedClaims(removed)) return 0;
+        return writeClaimed(kept) ? removed.length : 0;
+    }
+
     function isClaimed(id) {
-        return readClaimed().indexOf(String(id)) !== -1;
+        var key = String(id);
+        if (readClaimed().some(function (item) { return item.id === key; })) return true;
+        return readLockedClaims().some(function (item) { return item.id === key; });
+    }
+
+    function getClaimRecord(id) {
+        var key = String(id);
+        var list = readClaimed();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === key) return list[i];
+        }
+        var locked = readLockedClaims();
+        for (var j = 0; j < locked.length; j++) {
+            if (locked[j].id === key) {
+                return { id: key, status: locked[j].status, time: 0, locked: true };
+            }
+        }
+        return null;
+    }
+
+    // 把一次作答标记为过期：仍占用 claimed 名额，首页/详情页不能再进入作答
+    function markClaimExpired(id, reason) {
+        var list = readClaimed();
+        if (list.some(function (item) { return item.id === String(id); })) return true;
+        list.push({
+            id: String(id),
+            time: Date.now(),
+            status: 'expired',
+            reason: reason || 'expired'
+        });
+        return writeClaimed(list);
     }
 
     /* ---------------- 作答记录（统计用，仅发布者页面展示） ---------------- */
@@ -260,7 +412,7 @@
                 out.push({
                     id: String(s.id),
                     title: String(s.title),
-                    publisher: s.publisher ? String(s.publisher) : '我',
+                    publisher: readNickname(),
                     category: CATEGORIES.indexOf(s.category) !== -1 ? s.category : '其他',
                     minutes: isNaN(minutes) || minutes < 1 ? 3 : (minutes > 60 ? 60 : minutes),
                     reward: REWARD,
@@ -399,8 +551,7 @@
             return { ok: false, error: '标题最多 ' + MAX_TITLE_LEN + ' 个字' };
         }
 
-        var publisher = String(data.publisher == null ? '' : data.publisher).trim() || '我';
-        if (publisher.length > 20) publisher = publisher.slice(0, 20);
+        var publisher = readNickname(); // 发布者统一显示用户昵称，忽略外部传入的真实姓名
 
         var category = CATEGORIES.indexOf(data.category) !== -1 ? data.category : '其他';
 
@@ -487,8 +638,7 @@
             return { ok: false, error: '标题最多 ' + MAX_TITLE_LEN + ' 个字' };
         }
 
-        var publisher = String(data.publisher == null ? '' : data.publisher).trim() || '我';
-        if (publisher.length > 20) publisher = publisher.slice(0, 20);
+        var publisher = readNickname(); // 发布者统一显示用户昵称，忽略外部传入的真实姓名
 
         var category = CATEGORIES.indexOf(data.category) !== -1 ? data.category : '其他';
 
@@ -575,16 +725,60 @@
         return list[list.length - 1].at || 0;
     }
 
-    // “我填写过的问卷”：按 claimed 顺序返回 id / 标题 / 奖励 / 填写时间，供个人中心列表使用
+    // 某份问卷最近一次作答的原始答案（旧 claimed 记录没有 answers 时回退使用）
+    function getResponseAnswers(surveyId) {
+        var list = readResponses().filter(function (r) {
+            return r.surveyId === String(surveyId);
+        });
+        if (list.length === 0) return null;
+        return list[list.length - 1].answers;
+    }
+
+    // 把答案索引翻译成“题目 → 选项文字”，供个人中心安全渲染（不拼 HTML）
+    function describeAnswers(survey, answers) {
+        if (!survey || !Array.isArray(answers)) return [];
+        return survey.questions.map(function (item, qi) {
+            var value = answers[qi];
+            var label = '';
+            if (item.type === 'open') {
+                label = typeof value === 'string' ? value.trim() : '';
+                return { q: item.q, a: label || '未填写' };
+            }
+
+            var picked = [];
+            if (typeof value === 'number') {
+                picked.push(value);
+            } else if (Array.isArray(value)) {
+                value.forEach(function (v) {
+                    if (typeof v === 'number') picked.push(v);
+                });
+            }
+            var labels = picked
+                .filter(function (index) { return index >= 0 && index < item.options.length; })
+                .map(function (index) { return item.options[index]; });
+            if (item.type !== 'multiple') labels = labels.slice(0, 1);
+            return { q: item.q, a: labels.length ? labels.join('、') : '未作答' };
+        });
+    }
+
+    // “我填写过的问卷”：按 claimed 顺序返回 id / 标题 / 奖励 / 填写时间 / 我的作答
     function getClaimedSurveys() {
-        return readClaimed().map(function (id) {
+        return readClaimed().map(function (item) {
+            var id = item.id;
             var survey = getSurveyById(id);
+            var expired = item.status === 'expired';
+            var incomplete = item.status === 'incomplete';
+            var answers = Array.isArray(item.answers) ? item.answers : getResponseAnswers(id);
             return {
                 id: id,
                 title: survey ? survey.title : '问卷已删除',
-                reward: survey ? surveyReward(survey) : REWARD,
+                reward: (expired || incomplete) ? 0 : (survey ? surveyReward(survey) : REWARD),
                 exists: !!survey,
-                time: getResponseTime(id)
+                status: expired ? 'expired' : (incomplete ? 'incomplete' : 'done'),
+                reason: item.reason || '',
+                time: item.time || getResponseTime(id),
+                answers: answers,
+                answerLines: survey ? describeAnswers(survey, answers) : []
             };
         });
     }
@@ -706,7 +900,7 @@
 
     /* ---------------- 逾期未完成：扣 20 信誉分（不扣积分） ---------------- */
     function markAttemptStarted(survey) {
-        if (!survey || !survey.endAt || isClaimed(survey.id)) return;
+        if (!survey || survey.mine || !survey.endAt || isClaimed(survey.id)) return;
         if (surveyWindowState(survey) !== 'open') return;
 
         var list = readAttempts();
@@ -746,25 +940,36 @@
         var attempts = readAttempts();
         if (attempts.length === 0) return 0;
 
-        var claimed = readClaimed();
+        var claimedIds = readClaimed().map(function (item) { return item.id; });
+        var lockedIds = readLockedClaims().map(function (item) { return item.id; });
+        var beforeClaimed = lsGet(CLAIMED_KEY);
         var beforeCredit = readCredit();
         var credit = beforeCredit;
         var now = Date.now();
         var changed = false;
+        var expiredIds = [];
         var count = 0;
         var expiredTitles = [];
         var beforePenalized = attempts.map(function (a) { return !!a.penalized; });
 
         attempts.forEach(function (attempt) {
             if (attempt.penalized) return;
-            if (claimed.indexOf(attempt.surveyId) !== -1) {
+            var survey = getSurveyById(attempt.surveyId);
+            if (survey && survey.mine) {
+                // 发布者没有“作答”义务；历史脏记录直接作废，不扣分
+                attempt.penalized = true;
+                changed = true;
+                return;
+            }
+            if (claimedIds.indexOf(attempt.surveyId) !== -1 ||
+                lockedIds.indexOf(attempt.surveyId) !== -1) {
                 attempt.penalized = true;
                 changed = true;
                 return;
             }
 
-            var survey = getSurveyById(attempt.surveyId);
-            var endAt = survey && survey.endAt ? survey.endAt : attempt.endAt;
+            // 以作答开始时的截止时间为准：发布者之后改日期，不影响这次作答的判定
+            var endAt = attempt.endAt || (survey && survey.endAt);
             if (!endAt) {
                 attempt.penalized = true; // 无有效截止时间的脏记录，直接作废
                 changed = true;
@@ -776,19 +981,34 @@
             attempt.penalized = true;
             changed = true;
             count++;
+            expiredIds.push(String(attempt.surveyId));
             expiredTitles.push(survey ? survey.title : '问卷');
         });
 
         if (!changed) return 0;
 
-        // 先落“已处理”标记，避免下一次加载重复扣分；标记写失败就什么都不做
-        if (!writeAttempts(attempts)) return 0;
+        // 已逾期的作答先写入 claimed（status=expired），确保用户不能再次进入作答
+        if (expiredIds.length > 0) {
+            var claimList = readClaimed();
+            expiredIds.forEach(function (id) {
+                if (claimList.some(function (item) { return item.id === id; })) return;
+                claimList.push({ id: id, time: now, status: 'expired', reason: 'timeout' });
+            });
+            if (!writeClaimed(claimList)) return 0;
+        }
+
+        // 先落“已处理”标记，避免下一次加载重复扣分；标记写失败就回滚 claimed
+        if (!writeAttempts(attempts)) {
+            if (expiredIds.length > 0) lsRestore(CLAIMED_KEY, beforeClaimed);
+            return 0;
+        }
         if (credit !== beforeCredit && !writeCredit(credit)) {
             // 信誉分写失败时按原快照回退，只重试本次新增的逾期记录
             attempts.forEach(function (attempt, i) {
                 attempt.penalized = beforePenalized[i];
             });
             writeAttempts(attempts);
+            if (expiredIds.length > 0) lsRestore(CLAIMED_KEY, beforeClaimed);
             return 0;
         }
 
@@ -969,8 +1189,8 @@
                               'onclick="claimOnboard()">新人任务 +40</button>') +
                         '<p class="text-muted mb-0 mt-1" style="font-size:.72rem">' +
                             (onboarded
-                                ? '完成问卷 +5 · 信誉分 ≥40 可发布'
-                                : '完成后信誉 +40，达到 40 才能发布') +
+                                ? '完成问卷 +5 · 发布需 10 积分 + 40 信誉'
+                                : '完成后信誉 +40，发布还需 10 积分') +
                         '</p>' +
                     '</div>' +
                 '</div>' +
@@ -1030,7 +1250,7 @@
             window.alert('信誉分保存失败，请重试');
             return false;
         }
-        if (!writePoints(beforePoints + ONBOARD_POINTS)) {
+        if (ONBOARD_POINTS > 0 && !writePoints(beforePoints + ONBOARD_POINTS)) {
             rollback();
             window.alert('积分保存失败，请重试');
             return false;
@@ -1047,9 +1267,12 @@
                 after: afterCredit
             });
         }
-        var pointsLogOk = pushLog(POINTS_LOG_KEY, {
-            time: Date.now(), delta: ONBOARD_POINTS, reason: '新人任务奖励', after: readPoints()
-        });
+        var pointsLogOk = true;
+        if (ONBOARD_POINTS > 0) {
+            pointsLogOk = pushLog(POINTS_LOG_KEY, {
+                time: Date.now(), delta: ONBOARD_POINTS, reason: '新人任务奖励', after: readPoints()
+            });
+        }
 
         // onboarded 是防重复领取的关键，写入失败必须回滚，否则可以反复点
         if (!creditLogOk || !pointsLogOk || !lsSet(ONBOARD_KEY, '1')) {
@@ -1096,6 +1319,41 @@
         }
     }
 
+    // 未答完：不发积分、扣 5 信誉，但个人中心仍可查看作答
+    function markIncomplete(el) {
+        if (el.classList.contains('btn-success')) {
+            el.classList.replace('btn-success', 'btn-secondary');
+        }
+        if (el.classList.contains('btn-outline-primary')) {
+            el.classList.replace('btn-outline-primary', 'btn-secondary');
+        }
+        el.classList.add('disabled');
+        el.textContent = '未答完，不能重复提交';
+        el.setAttribute('aria-disabled', 'true');
+        if (el.tagName === 'A') {
+            el.removeAttribute('href');
+        } else {
+            el.disabled = true;
+        }
+    }
+
+    function markExpired(el) {
+        if (el.classList.contains('btn-success')) {
+            el.classList.replace('btn-success', 'btn-secondary');
+        }
+        if (el.classList.contains('btn-outline-primary')) {
+            el.classList.replace('btn-outline-primary', 'btn-secondary');
+        }
+        el.classList.add('disabled');
+        el.textContent = '已过期，无法再次作答';
+        el.setAttribute('aria-disabled', 'true');
+        if (el.tagName === 'A') {
+            el.removeAttribute('href');
+        } else {
+            el.disabled = true;
+        }
+    }
+
     function surveyMinutes(survey) {
         var n = parseInt(survey && survey.minutes, 10);
         return isNaN(n) || n < 1 ? 3 : n;
@@ -1114,11 +1372,17 @@
         return meta;
     }
 
-    // 单张首页卡片：仍是 <a href="detail.html?id=...">，置灰逻辑无需改动
+    // 单张首页卡片：完成/过期的问卷不再渲染，只保留待填写的
     function surveyCardHtml(survey) {
         var badge = survey.mine
             ? ' <span class="badge bg-info text-dark align-middle">我发布的</span>'
             : '';
+        var action = survey.mine
+            ? '<a href="detail.html?id=' + encodeURIComponent(survey.id) + '" ' +
+                'class="btn btn-outline-secondary w-100">查看作答统计</a>'
+            : '<a href="detail.html?id=' + encodeURIComponent(survey.id) + '" ' +
+                'class="btn btn-outline-primary w-100">去填写 (赚 ' +
+                surveyReward(survey) + ' 积分)</a>';
 
         return '' +
             '<div class="col-12 mb-3">' +
@@ -1130,16 +1394,13 @@
                             ' | 预计耗时: ' + surveyMinutes(survey) + '分钟' +
                             ' | 共 ' + survey.questions.length + ' 题' +
                         '</p>' +
-                        '<a href="detail.html?id=' + encodeURIComponent(survey.id) + '" ' +
-                           'class="btn btn-outline-primary w-100">' +
-                            '去填写 (赚 ' + surveyReward(survey) + ' 积分)' +
-                        '</a>' +
+                        action +
                     '</div>' +
                 '</div>' +
             '</div>';
     }
 
-    // 首页列表：内置问卷 + 用户发布的问卷，全部由数据渲染
+    // 首页列表：只渲染待填写问卷；已完成/已过期收成底部一行入口
     function renderSurveyList() {
         var box = document.getElementById('question-list');
         if (!box) return; // 非首页（详情页/发布页）没有这个容器
@@ -1151,20 +1412,84 @@
             return;
         }
 
-        var html = '';
+        var pending = [];
+        var doneCount = 0;
+        var expiredCount = 0;
+        var incompleteCount = 0;
+
+        // 只统计个人中心还能展示的记录；7 天清理后留下的 lockedClaims
+        // 只用于防重复，不能再显示成“已完成 N 份”。
+        var visibleHistory = {};
+        getClaimedSurveys().forEach(function (item) {
+            visibleHistory[String(item.id)] = item;
+        });
+
         all.forEach(function (survey) {
+            var record = getClaimRecord(survey.id);
+            if (!record) {
+                pending.push(survey);
+                return;
+            }
+            var visible = visibleHistory[String(survey.id)];
+            if (!visible) return; // 记录已按隐私策略清理，不计入首页统计
+            if (visible.status === 'expired') expiredCount++;
+            else if (visible.status === 'incomplete') incompleteCount++;
+            else doneCount++;
+        });
+
+        var parts = [];
+        if (doneCount > 0) parts.push('已完成 ' + doneCount + ' 份');
+        if (incompleteCount > 0) parts.push(incompleteCount + ' 份未答完');
+        if (expiredCount > 0) parts.push(expiredCount + ' 份已过期');
+        var summaryText = parts.join('，');
+
+        var html = '';
+        pending.forEach(function (survey) {
             html += surveyCardHtml(survey);
         });
-        box.innerHTML = html;
 
-        syncIndexCards(); // 渲染完成后按 claimed 置灰
+        if (pending.length === 0) {
+            html += '<div class="col-12">' +
+                '<div class="card border-0 bg-white text-center py-5">' +
+                    '<div class="fs-2 mb-2">🎉</div>' +
+                    '<h5 class="mb-1">待填写的问卷都完成了</h5>' +
+                    '<p class="text-muted small mb-3">' +
+                        (summaryText
+                            ? summaryText + '，记录已保存，可以在个人中心随时查看。'
+                            : '已完成记录已按隐私策略清理，新的填写记录会显示在这里。') +
+                    '</p>' +
+                    '<div class="d-flex justify-content-center gap-2">' +
+                        '<a class="btn btn-outline-primary btn-sm" href="profile.html">去个人中心看记录</a>' +
+                        '<a class="btn btn-primary btn-sm" href="publish.html">去发布一份</a>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        } else if (summaryText) {
+            html += '<div class="col-12 text-center small text-muted mt-2">' +
+                summaryText + ' · ' +
+                '<a href="profile.html" class="text-decoration-none">去个人中心查看</a>' +
+                '</div>';
+        }
+
+        box.innerHTML = html;
+        syncIndexCards(); // 兜底：若列表里仍有待填写链接，按 claimed 状态处理
     }
 
     // 首页：只处理 href 里带 detail.html?id= 的链接，id 从 href 解析
     function syncIndexCards() {
         if (!isIndexPage()) return;
 
-        var claimed = readClaimed();
+        var claimedMap = {};
+        readClaimed().forEach(function (item) {
+            claimedMap[item.id] = item.status === 'expired' ? 'expired'
+                : (item.status === 'incomplete' ? 'incomplete' : 'done');
+        });
+        // 7 天清理后展示记录没了，但永久锁仍在：首页仍应显示“已完成/已过期”
+        readLockedClaims().forEach(function (item) {
+            if (!claimedMap[item.id]) {
+                claimedMap[item.id] = item.status === 'expired' ? 'expired' : 'done';
+            }
+        });
         document.querySelectorAll('a[href*="detail.html?id="]').forEach(function (a) {
             var href = a.getAttribute('href') || '';
             var matched = href.match(/detail\.html\?id=([^&#]+)/);
@@ -1176,7 +1501,13 @@
             } catch (err) {
                 id = matched[1];
             }
-            if (claimed.indexOf(id) !== -1) markDone(a);
+            if (claimedMap[id] === 'expired') {
+                markExpired(a);
+            } else if (claimedMap[id] === 'incomplete') {
+                markIncomplete(a);
+            } else if (claimedMap[id] === 'done') {
+                markDone(a);
+            }
         });
     }
 
@@ -1188,6 +1519,8 @@
         var survey = currentSurvey();
         if (!survey) {
             showMissingSurvey(); // 跨标签删除时同步清掉残留题目
+            stopAnswerTimer();
+            setTimerVisible(false);
             btn.className = 'btn btn-secondary w-100 py-2 mt-2';
             btn.disabled = true;
             btn.textContent = '问卷不可用';
@@ -1195,30 +1528,58 @@
         }
         if (survey.mine) {
             // 发布者只能查看统计，不能填写自己的问卷
+            stopAnswerTimer();
+            setTimerVisible(false);
             btn.classList.add('d-none');
             btn.disabled = true;
             var mineTip = document.getElementById('tip');
             if (mineTip) mineTip.style.display = 'none';
             return;
         }
-        if (isClaimed(getQid())) {
-            markDone(btn);
+        var record = getClaimRecord(getQid());
+        if (record) {
+            stopAnswerTimer();
+            setTimerVisible(false);
+            if (record.status === 'expired') {
+                markExpired(btn);
+                var expiredTip = document.getElementById('tip');
+                if (expiredTip) {
+                    expiredTip.className = 'alert alert-warning mt-3 mb-0';
+                    expiredTip.textContent = '本次作答已被标记为过期，不能再次作答。';
+                    expiredTip.style.display = '';
+                }
+            } else if (record.status === 'incomplete') {
+                markIncomplete(btn);
+                var incompleteTip = document.getElementById('tip');
+                if (incompleteTip) {
+                    incompleteTip.className = 'alert alert-warning mt-3 mb-0';
+                    incompleteTip.textContent = '本次问卷未答完，未获得积分并扣除 5 信誉分，不能重复提交。';
+                    incompleteTip.style.display = '';
+                }
+            } else {
+                markDone(btn);
+            }
             return;
         }
 
         var state = surveyWindowState(survey);
         if (state === 'before') {
+            stopAnswerTimer();
+            setTimerVisible(false);
             btn.className = 'btn btn-secondary w-100 py-2 mt-2';
             btn.disabled = true;
             btn.textContent = '问答尚未开始，暂不可作答';
             return;
         }
         if (state === 'ended') {
+            stopAnswerTimer();
+            setTimerVisible(false);
             btn.className = 'btn btn-secondary w-100 py-2 mt-2';
             btn.disabled = true;
             btn.textContent = '问答已截止，作答无效';
             return;
         }
+        if (!timerInterval) startAnswerTimer(); // 从其它标签恢复可作答状态时补启动
         updateClaimButtonState(); // 未领取时按答题进度控制灰/绿
     }
 
@@ -1274,23 +1635,35 @@
         if (title) title.textContent = survey.title;
         if (meta) meta.textContent = surveyMeta(survey);
 
+        var claimRecord = getClaimRecord(survey.id);
+        if (claimRecord && claimRecord.status === 'expired') {
+            // 已判定过期/敷衍：不再渲染题目，直接展示空状态，避免“还能继续作答”的错觉
+            body.innerHTML = '<div class="alert alert-warning mb-0">本次作答已被标记为过期，不能再次作答。' +
+                '<div class="small mt-1">如需重新参与，请等待发布者重新发布问卷。</div></div>';
+            syncDetailButton();
+            return;
+        }
+
         var state = surveyWindowState(survey);
         var stats = survey.mine ? getSurveyStats(survey) : null;
         var statsUi = window.SurveyStatsUI || null;
 
-        var html = '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
-            '<span class="badge bg-warning text-dark">🔒 已锁定</span>';
-        if (survey.mine) {
-            html += '<a class="btn btn-sm btn-outline-primary" href="publish.html?edit=' +
-                encodeURIComponent(survey.id) + '">编辑问卷</a>';
+        // 填写中不显示“已锁定”；查看已提交记录、发布者视图时才显示
+        var html = '';
+        if (claimRecord || survey.mine) {
+            html += '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
+                '<span class="badge bg-warning text-dark">🔒 已锁定</span>';
+            if (survey.mine) {
+                html += '<a class="btn btn-sm btn-outline-primary" href="publish.html?edit=' +
+                    encodeURIComponent(survey.id) + '">编辑问卷</a>';
+            }
+            html += '</div>';
         }
-        html += '</div>';
-        html += '<p class="small text-muted mb-3">本问卷已锁定：填写者无权更改题目。</p>';
         if (survey.mine) {
             html += '<p class="small text-muted mb-2">发布者视图：题目下方展示作答统计，仅发布者可见；发布者不能填写自己的问卷。</p>';
         }
 
-        if (survey.startAt && survey.endAt) {
+        if (survey.startAt && survey.endAt && !survey.mine && !claimRecord) {
             html += '<div class="alert ' + (state === 'ended' ? 'alert-danger' : 'alert-info') +
                 ' survey-deadline-alert mb-3" role="status">' +
                 '<div class="fw-semibold">请注意在截至日期内完成作答，否则视为无效</div>' +
@@ -1356,7 +1729,24 @@
         });
 
         body.innerHTML = html;
-        if (state === 'before' || state === 'ended' || isClaimed(survey.id)) {
+
+        // 已提交：把当时选择的选项回填并锁定，便于个人中心点“查看作答”时高亮
+        if (claimRecord && claimRecord.status !== 'expired') {
+            var savedAnswers = Array.isArray(claimRecord.answers)
+                ? claimRecord.answers
+                : getResponseAnswers(survey.id);
+            if (savedAnswers) {
+                fillSubmittedAnswers(survey, savedAnswers);
+                var historyTip = document.getElementById('tip');
+                if (historyTip) {
+                    historyTip.className = 'alert alert-info mt-3 mb-0';
+                    historyTip.textContent = '以上为你提交时的作答，选项已锁定。';
+                    historyTip.style.display = '';
+                }
+            }
+        }
+
+        if (state === 'before' || state === 'ended' || survey.mine || isClaimed(survey.id)) {
             disableAnswerInputs(body);
         }
         syncDetailButton();
@@ -1423,13 +1813,11 @@
         return !!body.querySelector('input[name="' + name + '"]:checked');
     }
 
-    // 逐题检查，给所有未答题的题块加红框，返回是否全部答完
-    function validateAnswers() {
+    // 统计未答题数，并返回第一道未答题的题块（用于滚动定位）
+    function countUnanswered(survey) {
         var body = document.getElementById('q-body');
-        var survey = currentSurvey();
-        if (!body || !survey) return false;
-
-        var missing = [];
+        var result = { count: 0, firstBlock: null };
+        if (!body || !survey) return result;
 
         survey.questions.forEach(function (item, qi) {
             var name = 'q' + (qi + 1);
@@ -1440,20 +1828,39 @@
             if (isQuestionAnswered(item, name, body)) {
                 clearMissing(block);
             } else {
-                markMissing(block);
-                missing.push(block);
+                result.count++;
+                if (!result.firstBlock) result.firstBlock = block;
             }
         });
+        return result;
+    }
 
-        if (missing.length === 0) return true;
+    // 允许带未答提交：弹确认框；取消时才把未答题标红并滚过去
+    function confirmPartialSubmit(survey) {
+        var info = countUnanswered(survey);
+        if (info.count === 0) return true;
 
-        window.alert('还有 ' + missing.length + ' 道题没回答，填完才能领取积分哦～');
-        try {
-            if (missing[0].scrollIntoView) {
-                missing[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var ok = window.confirm('还有 ' + info.count + ' 道题没有作答，确定提交吗？\n' +
+            '未作答的题目会按漏答计入质量核验。');
+        if (!ok) {
+            var body = document.getElementById('q-body');
+            if (body && survey) {
+                survey.questions.forEach(function (item, qi) {
+                    var name = 'q' + (qi + 1);
+                    var control = findAnswerControl(body, name);
+                    if (control && !isQuestionAnswered(item, name, body)) {
+                        markMissing(control.closest('.mb-3'));
+                    }
+                });
             }
-        } catch (err) { /* 部分环境不支持 scrollIntoView 配置对象，忽略 */ }
-        return false;
+            try {
+                if (info.firstBlock && info.firstBlock.scrollIntoView) {
+                    info.firstBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } catch (err) { /* 部分环境不支持配置对象，忽略 */ }
+            return false;
+        }
+        return true;
     }
 
     // 选中某题后立刻消掉该题的红框，并记录“已开始作答”用于逾期判定
@@ -1506,6 +1913,7 @@
         }
 
         var left = 0;
+        var total = survey.questions.length;
         survey.questions.forEach(function (item, qi) {
             if (!isQuestionAnswered(item, 'q' + (qi + 1), body)) left++;
         });
@@ -1515,11 +1923,18 @@
             btn.classList.add('btn-success');
             btn.disabled = false;
             btn.textContent = '提交问卷并领取积分';
-        } else {
+        } else if (left === total) {
+            // 一题未答：先不让点，避免误触把问卷直接记成无效
             btn.classList.remove('btn-success');
             btn.classList.add('btn-secondary');
             btn.disabled = true;
-            btn.textContent = '还差 ' + left + ' 题，填完即可领取';
+            btn.textContent = '请先作答';
+        } else {
+            // 已经答了一部分：允许提交，确认框会提示未答数量
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-success');
+            btn.disabled = false;
+            btn.textContent = '提交问卷（还差 ' + left + ' 题）';
         }
     }
 
@@ -1544,6 +1959,136 @@
         });
     }
 
+    // 质量核验：漏答、平均作答过快、直线作答、开放题无效
+    // 命中 2 项及以上判本次无效；单项命中只记录在提示里，不单独拦截。
+    function buildQualityFlags(survey, answers, durationSeconds) {
+        var flags = [];
+        var total = survey.questions.length;
+        if (!total) return flags;
+
+        var unanswered = 0;
+        answers.forEach(function (ans) {
+            if (ans === null || ans === undefined ||
+                (Array.isArray(ans) && ans.length === 0) ||
+                (typeof ans === 'string' && ans.trim() === '')) {
+                unanswered++;
+            }
+        });
+        if (unanswered > 0 && unanswered / total > 0.2) {
+            flags.push({
+                code: 'miss',
+                label: '漏答 ' + unanswered + ' 题（漏答率 ' + Math.round(unanswered / total * 100) + '%）'
+            });
+        }
+
+        var avgSeconds = durationSeconds / total;
+        if (durationSeconds > 0 && avgSeconds < MIN_ANSWER_SECONDS) {
+            flags.push({
+                code: 'fast',
+                label: '平均每题 ' + avgSeconds.toFixed(1) + ' 秒（低于 ' + MIN_ANSWER_SECONDS + ' 秒）'
+            });
+        }
+
+        // 直线作答：只看选择题，统计“同一选项位置”的占比
+        var picks = [];
+        survey.questions.forEach(function (item, qi) {
+            if (item.type === 'open') return;
+            var ans = answers[qi];
+            var first = Array.isArray(ans) ? (ans.length ? ans[0] : null) : ans;
+            if (typeof first === 'number') picks.push(first);
+        });
+        if (picks.length >= 2) {
+            var counts = {};
+            var maxSame = 0;
+            picks.forEach(function (index) {
+                counts[index] = (counts[index] || 0) + 1;
+                if (counts[index] > maxSame) maxSame = counts[index];
+            });
+            var ratio = maxSame / picks.length;
+            if (ratio >= 0.8) {
+                flags.push({
+                    code: 'straight',
+                    label: '同选项占比 ' + Math.round(ratio * 100) + '%'
+                });
+            }
+        }
+
+        // 开放题：去空格后少于 4 字，或同一字符占比 ≥80%
+        var openInvalid = 0;
+        var whitelist = { '无': 1, '没有': 1, '暂无': 1 };
+        survey.questions.forEach(function (item, qi) {
+            if (item.type !== 'open') return;
+            var text = String(answers[qi] || '').trim();
+            if (!text) return;
+            if (whitelist[text]) return;
+            if (text.length < 4) {
+                openInvalid++;
+                return;
+            }
+            var freq = {};
+            var maxChar = 0;
+            for (var i = 0; i < text.length; i++) {
+                var ch = text.charAt(i);
+                freq[ch] = (freq[ch] || 0) + 1;
+                if (freq[ch] > maxChar) maxChar = freq[ch];
+            }
+            if (maxChar / text.length >= 0.8) openInvalid++;
+        });
+        if (openInvalid > 0) {
+            flags.push({ code: 'open', label: openInvalid + ' 道开放题内容过短或重复' });
+        }
+
+        return flags;
+    }
+
+    /* ---------------- 作答计时 ---------------- */
+    function stopAnswerTimer() {
+        if (timerInterval) {
+            window.clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    function setTimerVisible(show) {
+        var box = document.getElementById('answer-timer');
+        if (!box) return;
+        if (show) box.classList.remove('d-none');
+        else box.classList.add('d-none');
+    }
+
+    function canStartAnswerTimer(survey) {
+        return !!survey && !survey.mine && !isClaimed(survey.id) &&
+            surveyWindowState(survey) === 'open';
+    }
+
+    function startAnswerTimer() {
+        var el = document.getElementById('timer-display');
+        if (!el) return;
+
+        var survey = currentSurvey();
+        if (!canStartAnswerTimer(survey)) {
+            // 已领取、已过期、发布者查看、未开始/已截止：不启动计时
+            stopAnswerTimer();
+            setTimerVisible(false);
+            claimStartTime = 0;
+            el.textContent = '0';
+            return;
+        }
+
+        setTimerVisible(true);
+        claimStartTime = Date.now();
+        el.textContent = '0';
+        stopAnswerTimer();
+        timerInterval = window.setInterval(function () {
+            var target = document.getElementById('timer-display');
+            if (!target) {
+                stopAnswerTimer();
+                return;
+            }
+            target.textContent = String(Math.floor((Date.now() - claimStartTime) / 1000));
+        }, 1000);
+    }
+
     /* ---------------- 业务：完成问卷，积分 +5、信誉分 +5 ---------------- */
     function claimPoints() {
         var qid = getQid();
@@ -1558,11 +2103,24 @@
             return false;
         }
 
-        // 防重复：已领过不加分，按钮保持灰色
-        if (claimed.indexOf(qid) !== -1) {
-            if (btn) markDone(btn);
+        // 防重复：领过、已过期或已转入永久锁都不再加分，按钮保持灰色
+        var existing = getClaimRecord(qid);
+        if (existing) {
+            if (existing.status === 'expired') {
+                if (btn) markExpired(btn);
+                window.alert('该问卷已过期，不能再次作答');
+            } else if (existing.status === 'incomplete') {
+                if (btn) markIncomplete(btn);
+                window.alert('该问卷未答完，不能重复提交');
+            } else if (btn) {
+                markDone(btn);
+            }
             return false;
         }
+
+        var durationSeconds = claimStartTime
+            ? Math.floor((Date.now() - claimStartTime) / 1000)
+            : 0;
 
         // 时间窗校验：未开始不能答；已截止视为无效，已开始的按逾期扣信誉分
         var state = surveyWindowState(survey);
@@ -1574,6 +2132,7 @@
         if (state === 'ended') {
             var beforePenalty = readCredit();
             applyExpiredPenalties();
+            markClaimExpired(qid, 'timeout');
             var deducted = beforePenalty - readCredit();
             window.alert('问答已截止，作答无效' +
                 (deducted > 0 ? '；未在截止时间内完成作答，已扣除 ' + deducted + ' 信誉分' : ''));
@@ -1581,10 +2140,79 @@
             return false;
         }
 
-        // 未答完不放行：不加分、不写 claimed
-        if (!validateAnswers()) return false;
-
+        // 允许带未答提交：先收集答案，再让用户确认漏答
         var answers = collectAnswers(survey);
+        if (!confirmPartialSubmit(survey)) return false;
+
+        // 漏答率 > 20%：不发积分，扣 5 信誉分，并保留作答供个人中心查看
+        var unanswered = 0;
+        answers.forEach(function (ans) {
+            if (ans === null || ans === undefined ||
+                (Array.isArray(ans) && ans.length === 0) ||
+                (typeof ans === 'string' && ans.trim() === '')) {
+                unanswered++;
+            }
+        });
+        var unansweredRatio = survey.questions.length ? unanswered / survey.questions.length : 0;
+        if (unansweredRatio > 0.2) {
+            var beforeClaimedRaw = lsGet(CLAIMED_KEY);
+            var incompleteList = readClaimed();
+            incompleteList.push({
+                id: qid,
+                time: Date.now(),
+                answers: answers,
+                status: 'incomplete',
+                reason: 'unanswered'
+            });
+            if (!writeClaimed(incompleteList)) {
+                window.alert('本地存储不可用，本次作答没有保存，请检查浏览器设置');
+                return false;
+            }
+            if (addCredit(-5, '未答完问卷：' + survey.title) === null) {
+                lsRestore(CLAIMED_KEY, beforeClaimedRaw);
+                window.alert('信誉分保存失败，本次提交没有完成，请重试');
+                return false;
+            }
+            if (btn) markIncomplete(btn);
+            refreshCredit();
+            renderScoreCards();
+            renderProfileCredit();
+            var incompleteTip = document.getElementById('tip');
+            if (incompleteTip) {
+                incompleteTip.className = 'alert alert-warning mt-3 mb-0';
+                incompleteTip.textContent = '本次未答完，未获得积分并扣除 5 信誉分。你可以在个人中心查看本次作答。';
+                incompleteTip.style.display = '';
+            }
+            window.alert('本次还有 ' + unanswered + ' 道题未作答（漏答率 ' +
+                Math.round(unansweredRatio * 100) + '%），未获得积分，信誉分 -5。\n' +
+                '你可以在个人中心查看本次作答。');
+            return false;
+        }
+
+        // 质量核验：从页面加载到提交不足 3 秒，判定为疑似刷分；本次机会作废
+        if (claimStartTime && durationSeconds < MIN_ANSWER_SECONDS) {
+            var marked = markClaimExpired(qid, 'fast');
+            if (btn) markExpired(btn);
+            window.alert('【质量核验拦截】本次作答仅耗时 ' + durationSeconds +
+                ' 秒。系统判定：疑似刷分，已拒绝发放积分！' +
+                (marked ? '' : ' 本次记录保存失败，请检查浏览器存储。'));
+            return false;
+        }
+
+        // 质量核验：过快 / 直线 / 开放题无效，命中 2 项以上判无效
+        var flags = buildQualityFlags(survey, answers, durationSeconds);
+        if (flags.length >= 2) {
+            var markedInvalid = markClaimExpired(qid, 'quality:' + flags.map(function (f) {
+                return f.code;
+            }).join('+'));
+            if (btn) markExpired(btn);
+            window.alert('【质量核验未通过】本次作答命中 ' + flags.length + ' 项风险：\n' +
+                flags.map(function (f) { return '· ' + f.label; }).join('\n') +
+                '\n本次不计分，且不能再次作答。' +
+                (markedInvalid ? '' : ' 本次记录保存失败，请检查浏览器存储。'));
+            return false;
+        }
+
         var beforePoints = readPoints();
         var beforeCredit = readCredit();
         var backup = {
@@ -1610,7 +2238,7 @@
         }
 
         // 领取记录 + 积分 + 信誉分 + 作答记录：任何一步失败都整体回滚
-        claimed.push(qid);
+        claimed.push({ id: qid, time: Date.now(), answers: answers });
         if (!writeClaimed(claimed)) {
             window.alert('本地存储不可用，领取记录没有保存，请检查浏览器设置');
             return false;
@@ -1655,7 +2283,8 @@
         var tip = document.getElementById('tip');
         if (tip) {
             tip.textContent = '积分 +' + surveyReward(survey) + '、信誉分 +' + creditGain +
-                ' 成功！当前积分 ' + readPoints() + ' 分，信誉分 ' + readCredit() + ' 分';
+                ' 成功！当前积分 ' + readPoints() + ' 分，信誉分 ' + readCredit() + ' 分' +
+                '（用时 ' + durationSeconds + ' 秒）';
             tip.style.display = 'block';
         }
         return true;
@@ -1674,6 +2303,7 @@
             [POINTS_LOG_KEY, '[]'],
             [RESPONSES_KEY, '[]'],
             [ATTEMPTS_KEY, '[]'],
+            [LOCKED_KEY, '[]'],
             [ONBOARD_KEY, '0']
         ];
         var backup = entries.map(function (entry) { return lsGet(entry[0]); });
@@ -1695,6 +2325,8 @@
 
     /* ---------------- 初始化 ---------------- */
     function init() {
+        claimStartTime = 0;          // 只有真正可作答的问卷才启动计时
+        cleanupClaimed();            // 超期记录先转入 lockedClaims，再清理展示记录
         readPoints();      // 首次进入写入初始 0
         readCredit();      // 首次进入写入初始信誉分 0
         applyExpiredPenalties(); // 上次开始作答但已过截止时间的，先扣 20 信誉分
@@ -1703,6 +2335,7 @@
         renderScoreCards();
         renderProfileCredit();
         renderDetail();    // 仅详情页生效
+        if (!timerInterval) startAnswerTimer(); // 仅在可作答且存在 #timer-display 时启动
         var body = document.getElementById('q-body');
         if (body) {
             body.addEventListener('change', onAnswerChange);
@@ -1741,11 +2374,16 @@
                 score: readPoints(),
                 credit: credit,
                 level: creditLevel(credit).name,
-                onboarded: lsGet(ONBOARD_KEY) === '1'
+                onboarded: lsGet(ONBOARD_KEY) === '1',
+                nickname: readNickname()
             };
         },
+        getNickname: readNickname,
+        setNickname: writeNickname,
         getCredit: readCredit,
-        onboard: claimOnboard
+        onboard: claimOnboard,
+        cleanupClaimed: cleanupClaimed,
+        claimedRetentionDays: 7
     };
 
     Object.defineProperty(store, 'points', {
@@ -1769,7 +2407,7 @@
     // 跨标签页同步：发布页写入后，已打开的首页会自动刷新出新卡片
     window.addEventListener('storage', function (e) {
         if (e.key === null || e.key === POINTS_KEY ||
-            e.key === CLAIMED_KEY || e.key === SURVEYS_KEY ||
+            e.key === CLAIMED_KEY || e.key === LOCKED_KEY || e.key === SURVEYS_KEY ||
             e.key === RESPONSES_KEY || e.key === ATTEMPTS_KEY ||
             e.key === CREDIT_KEY || e.key === CREDIT_LOG_KEY ||
             e.key === POINTS_LOG_KEY || e.key === ONBOARD_KEY) {

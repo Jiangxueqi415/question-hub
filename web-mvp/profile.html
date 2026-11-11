@@ -24,6 +24,17 @@
     <div class="container pb-5 mt-3">
         <h4 class="mb-3">我的</h4>
 
+        <!-- 发布者昵称：所有自己发布的问卷统一显示这个名字 -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-2 d-flex align-items-center gap-2 flex-wrap">
+                <label for="nickname-input" class="small text-muted mb-0 text-nowrap">我的昵称</label>
+                <input type="text" class="form-control form-control-sm flex-grow-1"
+                       id="nickname-input" maxlength="20" autocomplete="off">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="nickname-save">保存</button>
+                <span class="small text-success" id="nickname-tip"></span>
+            </div>
+        </div>
+
         <!-- 积分 / 信誉分总览：数值由 app.js 统一刷新 -->
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
@@ -58,11 +69,11 @@
             </div>
         </div>
 
-        <!-- 信誉分 / 积分流水 -->
-        <div class="card border-0 shadow-sm mb-4">
+        <!-- 信誉分流水 -->
+        <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h6 class="mb-0">积分与信誉分记录</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h6 class="mb-0">信誉分记录</h6>
                     <div class="d-flex gap-2">
                         <button id="onboard-btn" type="button" class="btn btn-sm btn-success"
                                 onclick="claimOnboard()">新人任务 +40</button>
@@ -70,16 +81,15 @@
                                 onclick="demoPenalty()">演示：逾期 -20</button>
                     </div>
                 </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="text-muted small mb-1">信誉分记录</div>
-                        <div id="credit-timeline"></div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="text-muted small mb-1">积分记录</div>
-                        <div id="points-timeline"></div>
-                    </div>
-                </div>
+                <div id="credit-timeline"></div>
+            </div>
+        </div>
+
+        <!-- 积分流水 -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <h6 class="mb-2">积分记录</h6>
+                <div id="points-timeline"></div>
             </div>
         </div>
 
@@ -93,6 +103,7 @@
         <!-- 我填写过的问卷：按领取顺序整理 -->
         <h5 class="mb-2">我填写过的问卷</h5>
         <div id="my-history" class="mb-4"></div>
+        <p class="text-muted small mb-4">* 根据隐私保护策略，您的填写记录将在 7 天后自动销毁。</p>
     </div>
 
     <!-- 底部导航栏 -->

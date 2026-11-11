@@ -607,7 +607,7 @@
     function addCredit(delta, reason) {
         var next = Math.max(0, Math.min(CREDIT_MAX, readCredit() + delta));
         if (!writeCredit(next)) return null;
-        pushLog(CREDIT_LOG_KEY, { time: Date.now(), delta: delta, reason: reason, after: next });
+        pushLog(CREDIT_LOG_KEY, { time: Date.now(), delta: next - readCredit(), reason: reason, after: next });
         return next;
     }
 
@@ -1138,14 +1138,14 @@
         if (!validateAnswers()) return false;
 
         // 记录领取 + 加积分：两处写入都要确认成功，失败就回滚，避免刷分或少加分
-        claimed.push(qid);
+        claimed.push({ id: qid, time: Date.now() });
         if (!writeClaimed(claimed)) {
             window.alert('本地存储不可用，领取记录没有保存，请检查浏览器设置');
             return false;
         }
         var nextPoints = readPoints() + surveyReward(survey);
         if (!writePoints(nextPoints)) {
-            writeClaimed(claimed.filter(function (id) { return id !== qid; }));
+            writeClaimed(claimed.filter(function (item) { return item.id !== qid; }));
             window.alert('积分保存失败，请重试');
             return false;
         }

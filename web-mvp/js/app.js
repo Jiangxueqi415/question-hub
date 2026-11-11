@@ -753,6 +753,7 @@
         var changed = false;
         var count = 0;
         var expiredTitles = [];
+        var beforePenalized = attempts.map(function (a) { return !!a.penalized; });
 
         attempts.forEach(function (attempt) {
             if (attempt.penalized) return;
@@ -783,11 +784,9 @@
         // 先落“已处理”标记，避免下一次加载重复扣分；标记写失败就什么都不做
         if (!writeAttempts(attempts)) return 0;
         if (credit !== beforeCredit && !writeCredit(credit)) {
-            // 信誉分写失败时回退标记，保证下次还能重试
-            attempts.forEach(function (attempt) {
-                if (claimed.indexOf(attempt.surveyId) === -1 && attempt.penalized) {
-                    attempt.penalized = false;
-                }
+            // 信誉分写失败时按原快照回退，只重试本次新增的逾期记录
+            attempts.forEach(function (attempt, i) {
+                attempt.penalized = beforePenalized[i];
             });
             writeAttempts(attempts);
             return 0;
@@ -1185,12 +1184,21 @@
     function syncDetailButton() {
         var btn = document.getElementById('claim-btn');
         if (!btn) return;
+        btn.classList.remove('d-none');
         var survey = currentSurvey();
         if (!survey) {
             showMissingSurvey(); // 跨标签删除时同步清掉残留题目
             btn.className = 'btn btn-secondary w-100 py-2 mt-2';
             btn.disabled = true;
             btn.textContent = '问卷不可用';
+            return;
+        }
+        if (survey.mine) {
+            // 发布者只能查看统计，不能填写自己的问卷
+            btn.classList.add('d-none');
+            btn.disabled = true;
+            var mineTip = document.getElementById('tip');
+            if (mineTip) mineTip.style.display = 'none';
             return;
         }
         if (isClaimed(getQid())) {
@@ -1279,7 +1287,7 @@
         html += '</div>';
         html += '<p class="small text-muted mb-3">本问卷已锁定：填写者无权更改题目。</p>';
         if (survey.mine) {
-            html += '<p class="small text-muted mb-2">发布者视图：题目下方展示作答统计，仅发布者可见。</p>';
+            html += '<p class="small text-muted mb-2">发布者视图：题目下方展示作答统计，仅发布者可见；发布者不能填写自己的问卷。</p>';
         }
 
         if (survey.startAt && survey.endAt) {
@@ -1544,6 +1552,11 @@
         var btn = document.getElementById('claim-btn');
 
         if (!survey) return false; // 问卷不存在（已删除或链接错误）
+
+        if (survey.mine) {
+            window.alert('这是你发布的问卷，不能自己填写');
+            return false;
+        }
 
         // 防重复：已领过不加分，按钮保持灰色
         if (claimed.indexOf(qid) !== -1) {

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问卷互助平台 - 首页</title>
+    <!-- 引入 Bootstrap 5 的样式 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入你自己的样式 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-light">
+
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-dark bg-primary sticky-top">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">问卷互助</span>
+            <div class="d-flex align-items-center gap-2">
+                <!-- 这里显示积分（data-points 供 app.js 统一刷新） -->
+                <span class="text-white fw-bold small text-nowrap">当前积分: <span id="top-points" data-points>0</span> 分</span>
+                <!-- 一键重置：清空 points / claimed 后刷新 -->
+                <button type="button" class="btn btn-sm btn-light text-primary text-nowrap"
+                        onclick="resetDemoData()">重置演示</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主体内容区 -->
+    <div class="container mt-4 mb-5 pb-5">
+        <!-- 积分 / 信誉分双卡片：由 app.js 渲染，数值随 localStorage 实时更新 -->
+        <div class="row g-3 mb-3" id="score-cards"></div>
+
+        <!-- 适用边界：学术诚信声明（醒目提示，演示与答辩时都能看到） -->
+        <div class="alert alert-warning border-0 border-start border-4 border-warning shadow-sm mb-4" role="alert">
+            <div class="d-flex gap-2">
+                <span class="fs-5 lh-1">⚖️</span>
+                <div>
+                    <div class="fw-bold mb-1">适用边界（学术诚信声明）</div>
+                    <div class="small mb-0">本系统用于课程作业、科创训练等教学场景，不宣称样本代表性，不替代概率抽样与正规样本服务；本演示版暂不提供数据导出，涉及毕业论文或拟发表成果的研究，请另行采用规范抽样并如实说明样本来源。</div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="mb-3">最新问卷</h4>
+
+        <!-- 问卷列表：由 js/app.js 从 localStorage 渲染（内置问卷 + 用户自己发布的） -->
+        <div class="row" id="question-list">
+            <!-- 卡片由 app.js 生成，不要在这里写死 -->
+        </div>
+    </div>
+
+    <!-- 底部导航栏（固定在底部） -->
+    <nav class="navbar fixed-bottom navbar-light bg-white border-top">
+        <div class="container justify-content-around">
+            <a class="nav-link text-primary fw-bold" href="index.html">首页</a>
+            <a class="nav-link text-secondary" href="publish.html">发布问卷</a>
+            <a class="nav-link text-secondary" href="profile.html">我的</a>
+        </div>
+    </nav>
+
+    <!-- 引入 Bootstrap 的 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入你自己的 JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>

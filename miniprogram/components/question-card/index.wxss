@@ -1,0 +1,147 @@
+.question-card {
+  margin-bottom: 20rpx;
+  padding: 26rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 28rpx rgba(31, 58, 110, 0.06);
+}
+
+.question-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.question-card__heading {
+  display: flex;
+  align-items: center;
+}
+
+.question-card__no {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #2f6fed;
+}
+
+.question-card__type {
+  margin-left: 12rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  background: #f1f5ff;
+  font-size: 20rpx;
+  color: #6b7280;
+}
+
+.question-card__miss {
+  margin-left: 12rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  background: #fff4e5;
+  font-size: 20rpx;
+  color: #c2410c;
+}
+
+.question-card__done {
+  font-size: 20rpx;
+  color: #16a34a;
+}
+
+.question-card__title {
+  margin-top: 14rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #111827;
+}
+
+.options {
+  margin-top: 18rpx;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+  padding: 20rpx;
+  border: 1rpx solid transparent;
+  border-radius: 14rpx;
+  background: #f8fafc;
+}
+
+.option:last-child {
+  margin-bottom: 0;
+}
+
+.option--selected {
+  border-color: #2f6fed;
+  background: #eef4ff;
+}
+
+.option__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34rpx;
+  height: 34rpx;
+  border: 2rpx solid #c7d0de;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.option__mark--multi {
+  border-radius: 8rpx;
+}
+
+.option__mark--selected {
+  border-color: #2f6fed;
+  background: #2f6fed;
+}
+
+.option__check {
+  font-size: 22rpx;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.option__letter {
+  margin-left: 14rpx;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.option__text {
+  flex: 1;
+  margin-left: 10rpx;
+  font-size: 28rpx;
+  color: #374151;
+}
+
+.open-wrap {
+  margin-top: 16rpx;
+  padding: 20rpx;
+  border-radius: 14rpx;
+  background: #f8fafc;
+}
+
+.open-input {
+  width: 100%;
+  min-height: 140rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #1f2937;
+}
+
+.open-count {
+  margin-top: 8rpx;
+  text-align: right;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.open-readonly {
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #374151;
+  white-space: pre-wrap;
+}

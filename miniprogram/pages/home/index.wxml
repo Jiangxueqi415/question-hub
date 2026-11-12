@@ -1,0 +1,78 @@
+<view class="page home-page">
+  <view class="home-hero">
+    <view class="home-hero__main">
+      <view class="home-hero__hello">你好，{{me.nickname || '校园用户'}}</view>
+      <view class="home-hero__sub">先帮助别人，再发布自己的问卷</view>
+    </view>
+    <view class="home-hero__points">
+      <text class="home-hero__points-num">{{me.points}}</text>
+      <text class="home-hero__points-unit">积分</text>
+    </view>
+  </view>
+
+  <score-cards points="{{me.points}}" credit="{{me.credit}}" bind:credit="onCreditTap" />
+
+  <view wx:if="{{!me.onboarded}}" class="onboard-card" bindtap="onOnboard">
+    <text class="onboard-card__icon">🎁</text>
+    <view class="onboard-card__body">
+      <view class="onboard-card__title">新人任务：阅读互助规则</view>
+      <view class="onboard-card__desc">一次性获得 +40 信誉分（+0 积分）</view>
+    </view>
+    <view class="onboard-card__action">领取</view>
+  </view>
+
+  <view wx:else class="onboard-card onboard-card--done" bindtap="onViewLedger">
+    <text class="onboard-card__icon">✅</text>
+    <view class="onboard-card__body">
+      <view class="onboard-card__title">新人任务已完成</view>
+      <view class="onboard-card__desc">信誉分 +40，已写入信誉流水</view>
+    </view>
+    <view class="onboard-card__action">查看记录</view>
+  </view>
+
+  <view class="section-head">
+    <text class="section-head__title">待填写问卷</text>
+    <text class="section-head__count">{{pendingSurveys.length}} 份</text>
+  </view>
+
+  <view wx:if="{{loading && !pendingSurveys.length}}" class="home-loading">正在加载问卷…</view>
+
+  <block wx:elif="{{pendingSurveys.length}}">
+    <survey-card
+      wx:for="{{pendingSurveys}}"
+      wx:key="id"
+      survey="{{item}}"
+      bind:select="onSurveyTap"
+    />
+  </block>
+
+  <empty-state wx:else icon="✅" title="待填写的问卷都完成了" desc="{{emptyHint}}">
+    <view class="empty-actions">
+      <button class="btn btn--ghost btn--sm" bindtap="goProfile">去个人中心</button>
+      <button class="btn btn--primary btn--sm" bindtap="goPublish">去发布</button>
+    </view>
+  </empty-state>
+
+  <block wx:if="{{ownSurveys.length}}">
+    <view class="section-head">
+      <text class="section-head__title">我发布的问卷</text>
+      <text class="section-head__count">{{ownSurveys.length}} 份进行中</text>
+    </view>
+
+    <view
+      wx:for="{{ownSurveys}}"
+      wx:key="id"
+      class="own-card"
+      data-id="{{item.id}}"
+      bindtap="onOwnSurveyTap"
+    >
+      <view class="own-card__main">
+        <view class="own-card__title">{{item.title}}</view>
+        <view class="own-card__meta">{{item.statusText}} · 收到 {{item.responseCount}} 份 · {{item.questionCount}} 题</view>
+      </view>
+      <text class="own-card__action">查看统计 ›</text>
+    </view>
+  </block>
+
+  <view class="home-summary" bindtap="goProfile">{{summaryText}}</view>
+</view>

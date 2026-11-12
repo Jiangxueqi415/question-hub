@@ -1,0 +1,43 @@
+{
+  "description": "互答有据——校园问卷互助小程序（MVP 骨架，当前使用本地 Mock）",
+  "projectname": "question-hub-miniprogram",
+  "appid": "wxff54fd42da2c1ba7",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "libVersion": "trial",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": false,
+    "enhance": true,
+    "coverView": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false
+  },
+  "editorSetting": {
+    "tabIndent": "auto",
+    "tabSize": 2
+  },
+  "condition": {},
+  "simulatorPluginLibVersion": {}
+}

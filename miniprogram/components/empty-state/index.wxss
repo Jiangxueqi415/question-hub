@@ -1,0 +1,26 @@
+.empty-state {
+  padding: 64rpx 40rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 8rpx 28rpx rgba(31, 58, 110, 0.05);
+}
+
+.empty-state__icon {
+  font-size: 72rpx;
+  line-height: 1;
+}
+
+.empty-state__title {
+  margin-top: 20rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #374151;
+}
+
+.empty-state__desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #9ca3af;
+}

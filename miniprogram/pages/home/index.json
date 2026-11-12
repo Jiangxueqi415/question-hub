@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "互答有据",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "score-cards": "/components/score-cards/index",
+    "survey-card": "/components/survey-card/index",
+    "empty-state": "/components/empty-state/index"
+  }
+}

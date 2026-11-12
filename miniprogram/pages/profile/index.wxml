@@ -1,0 +1,128 @@
+<view class="page profile-page">
+  <view class="profile-head">
+    <view class="profile-head__avatar">{{avatarText}}</view>
+    <view class="profile-head__main">
+      <view wx:if="{{!editingNickname}}" class="profile-head__name-row">
+        <text class="profile-head__name">{{me.nickname || '校园用户'}}</text>
+        <text class="link-primary profile-head__edit" bindtap="onEditNickname">编辑</text>
+      </view>
+      <view wx:else class="nickname-editor">
+        <input
+          class="nickname-editor__input"
+          maxlength="20"
+          value="{{nicknameDraft}}"
+          bindinput="onNicknameDraftInput"
+        />
+        <text class="nickname-editor__save" bindtap="onSaveNickname">保存</text>
+        <text class="nickname-editor__cancel" bindtap="onCancelNickname">取消</text>
+      </view>
+      <view class="profile-head__sub">已绑定学号 · 校园互助用户</view>
+    </view>
+  </view>
+
+  <score-cards points="{{me.points}}" credit="{{me.credit}}" />
+
+  <view wx:if="{{!me.onboarded}}" class="onboard-card" bindtap="onOnboard">
+    <text class="onboard-card__icon">🎁</text>
+    <view class="onboard-card__body">
+      <view class="onboard-card__title">新人任务：阅读互助规则</view>
+      <view class="onboard-card__desc">一次性获得 +40 信誉分（+0 积分）</view>
+    </view>
+    <view class="onboard-card__action">领取</view>
+  </view>
+
+  <view wx:else class="onboard-card onboard-card--done">
+    <text class="onboard-card__icon">✅</text>
+    <view class="onboard-card__body">
+      <view class="onboard-card__title">新人任务已完成</view>
+      <view class="onboard-card__desc">信誉分 +40，已写入下方信誉流水</view>
+    </view>
+  </view>
+
+  <view class="card ledger-card">
+    <view class="ledger-tabs">
+      <view
+        class="ledger-tab {{logType === 'points' ? 'ledger-tab--active' : ''}}"
+        data-type="points"
+        bindtap="onSwitchLog"
+      >积分记录</view>
+      <view
+        class="ledger-tab {{logType === 'credit' ? 'ledger-tab--active' : ''}}"
+        data-type="credit"
+        bindtap="onSwitchLog"
+      >信誉分记录</view>
+    </view>
+
+    <view wx:if="{{logLoading}}" class="ledger-empty">正在加载流水…</view>
+    <block wx:elif="{{logs.length}}">
+      <view wx:for="{{logs}}" wx:key="id" class="ledger-row">
+        <view class="ledger-row__main">
+          <view class="ledger-row__reason">{{item.reason}}</view>
+          <view class="ledger-row__time">{{item.timeText}}</view>
+        </view>
+        <view class="ledger-row__right">
+          <view class="ledger-row__delta {{item.direction === 'up' ? 'ledger-row__delta--up' : 'ledger-row__delta--down'}}">
+            {{item.deltaText}}
+          </view>
+          <view class="ledger-row__balance">余额 {{item.balanceAfter}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="ledger-empty">
+      {{logType === 'points' ? '还没有积分变动记录' : '还没有信誉分变动记录'}}
+    </view>
+  </view>
+
+  <view class="section-head">
+    <text class="section-head__title">我发布的问卷</text>
+    <text class="section-head__count">{{mySurveys.length}} 份</text>
+  </view>
+
+  <block wx:if="{{mySurveys.length}}">
+    <view
+      wx:for="{{mySurveys}}"
+      wx:key="id"
+      class="list-card"
+      data-id="{{item.id}}"
+      bindtap="onMySurveyTap"
+    >
+      <view class="list-card__main">
+        <view class="list-card__title">{{item.title}}</view>
+        <view class="list-card__meta">{{item.deadlineText}} · 收到 {{item.responseCount}} 份 · {{item.questionCount}} 题</view>
+      </view>
+      <text class="tag {{item.tagClass}}">{{item.statusText}}</text>
+    </view>
+  </block>
+  <view wx:else class="muted-block">还没有发布过问卷</view>
+
+  <view class="section-head">
+    <text class="section-head__title">我填写的问卷</text>
+    <text class="section-head__count">{{myResponses.length}} 份</text>
+  </view>
+
+  <block wx:if="{{myResponses.length}}">
+    <view
+      wx:for="{{myResponses}}"
+      wx:key="id"
+      class="list-card"
+      data-index="{{index}}"
+      bindtap="onMyResponseTap"
+    >
+      <view class="list-card__main">
+        <view class="list-card__title">{{item.surveyTitle}}</view>
+        <view class="list-card__meta">{{item.timeText}} · {{item.resultText}}</view>
+      </view>
+      <text class="tag {{item.tagClass}}">{{item.statusText}}</text>
+    </view>
+  </block>
+  <view wx:else class="muted-block">还没有填写过问卷</view>
+
+  <view class="privacy-note">
+    根据隐私策略，填写记录展示 7 天后清理；已结算的积分 / 信誉流水不受影响。
+  </view>
+
+  <view wx:if="{{mockMode}}" class="dev-zone">
+    <button class="btn btn--ghost btn--sm" bindtap="onResetDemo">重置演示数据</button>
+    <view class="dev-zone__hint">Mock 模式专用：清空本地数据后回到登录页，便于重复演示。</view>
+  </view>
+</view>

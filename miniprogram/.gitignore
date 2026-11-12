@@ -1,0 +1,6 @@
+# 微信开发者工具本地私有配置（含本机 AppID、编译模式等），不提交
+project.private.config.json
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,131 @@
+.detail-loading {
+  padding: 80rpx 40rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  text-align: center;
+  font-size: 26rpx;
+  color: #9ca3af;
+}
+
+.detail-head {
+  margin-bottom: 20rpx;
+  padding: 30rpx;
+  border-radius: 26rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 28rpx rgba(31, 58, 110, 0.06);
+}
+
+.detail-head__title {
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #111827;
+}
+
+.detail-head__meta {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.detail-head__window {
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: #9ca3af;
+}
+
+.detail-head__reward {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #2f6fed;
+}
+
+.detail-banner {
+  margin-top: 20rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 14rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.detail-banner--info {
+  background: #eef4ff;
+  color: #2f6fed;
+}
+
+.detail-banner--success {
+  background: #e9f9ef;
+  color: #15803d;
+}
+
+.detail-banner--warn {
+  background: #fff4e5;
+  color: #c2410c;
+}
+
+.detail-banner--danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.detail-banner--gray {
+  background: #f1f3f7;
+  color: #6b7280;
+}
+
+.detail-tip {
+  margin: 0 4rpx 18rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+  color: #9ca3af;
+}
+
+.detail-submit {
+  margin-top: 28rpx;
+}
+
+.detail-submit__hint {
+  margin-bottom: 14rpx;
+  text-align: center;
+  font-size: 23rpx;
+  color: #9ca3af;
+}
+
+.detail-result {
+  margin-top: 28rpx;
+  padding: 30rpx;
+  border-radius: 22rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 28rpx rgba(31, 58, 110, 0.06);
+}
+
+.detail-result--success {
+  background: #f3fbf6;
+}
+
+.detail-result--warn {
+  background: #fffaf1;
+}
+
+.detail-result--danger {
+  background: #fff5f5;
+}
+
+.detail-result__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.detail-result__desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #6b7280;
+}
+
+.detail-result__actions {
+  margin-top: 20rpx;
+  display: flex;
+}

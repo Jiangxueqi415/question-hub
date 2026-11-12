@@ -104,3 +104,52 @@
   font-size: 24rpx;
   color: #2f6fed;
 }
+
+.bind-tip {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 1rpx solid #dbe6ff;
+  box-shadow: 0 8rpx 24rpx rgba(31, 58, 110, 0.05);
+}
+
+.bind-tip__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.bind-tip__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.bind-tip__desc {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8a94a6;
+}
+
+.bind-tip__action {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+  font-size: 24rpx;
+  color: #2f6fed;
+}
+
+.home-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 140rpx;
+  z-index: 20;
+  transform: translateX(-50%);
+  padding: 18rpx 36rpx;
+  border-radius: 999rpx;
+  background: rgba(17, 24, 39, 0.92);
+  color: #ffffff;
+  font-size: 24rpx;
+  white-space: nowrap;
+}

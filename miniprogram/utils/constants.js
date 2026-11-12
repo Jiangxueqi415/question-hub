@@ -43,8 +43,9 @@ module.exports = {
 
   TITLE_MIN_LEN: 2,
   TITLE_MAX_LEN: 40,
+  DESCRIPTION_MAX_LEN: 200,
   QUESTION_MIN: 1,
-  QUESTION_MAX: 10,
+  QUESTION_MAX: 25,
   QUESTION_TITLE_MAX_LEN: 100,
   OPTION_MIN: 2,
   OPTION_MAX: 6,
@@ -59,6 +60,7 @@ module.exports = {
 
   // ---------- 质量核验（PRD 6.5） ----------
   QUALITY: {
+    FAST_INVALID_SECONDS: 2,
     MIN_SECONDS: 3,
     MISS_RATE: 0.2,
     STRAIGHT_RATE: 0.8,
@@ -83,11 +85,14 @@ module.exports = {
 
   ERROR_MESSAGES: {
     AUTH_REQUIRED: '请先登录并绑定学号',
+    STUDENT_NOT_BOUND: '请先在“我的”绑定学号',
     STUDENT_ALREADY_BOUND: '该学号已绑定其他微信',
     SURVEY_NOT_FOUND: '问卷不存在或已被删除',
     SURVEY_CLOSED: '问卷已截止',
     SELF_ANSWER_FORBIDDEN: '发布者不能作答自己的问卷',
     ALREADY_SUBMITTED: '你已经提交过这份问卷',
+    SURVEY_HAS_RESPONSES: '该问卷已有作答，题目不可修改',
+    FORBIDDEN: '没有权限执行此操作',
     POINTS_NOT_ENOUGH: '积分不足，请先完成他人问卷',
     CREDIT_NOT_ENOUGH: '信誉分不足 40，暂不能发布',
     ATTEMPT_EXPIRED: '作答已失效或问卷已截止',

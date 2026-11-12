@@ -4,7 +4,8 @@
     "pages/home/index",
     "pages/detail/index",
     "pages/publish/index",
-    "pages/profile/index"
+    "pages/profile/index",
+    "pages/stats/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#2f6fed",

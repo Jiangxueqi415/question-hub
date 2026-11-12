@@ -34,6 +34,7 @@ Component({
       const tick = () => {
         const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         this.setData({ text: seconds + ' 秒' });
+        this.triggerEvent('tick', { seconds: seconds });
       };
 
       tick();

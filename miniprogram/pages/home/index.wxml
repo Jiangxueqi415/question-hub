@@ -12,7 +12,15 @@
 
   <score-cards points="{{me.points}}" credit="{{me.credit}}" bind:credit="onCreditTap" />
 
-  <view wx:if="{{!me.onboarded}}" class="onboard-card" bindtap="onOnboard">
+  <view wx:if="{{needBind}}" class="bind-tip" bindtap="goProfile">
+    <view class="bind-tip__main">
+      <view class="bind-tip__title">绑定学号后开始互助</view>
+      <view class="bind-tip__desc">绑定后可作答、领取积分和发布问卷</view>
+    </view>
+    <text class="bind-tip__action">去绑定 ›</text>
+  </view>
+
+  <view wx:elif="{{!me.onboarded}}" class="onboard-card" bindtap="onOnboard">
     <text class="onboard-card__icon">🎁</text>
     <view class="onboard-card__body">
       <view class="onboard-card__title">新人任务：阅读互助规则</view>
@@ -53,7 +61,7 @@
     </view>
   </empty-state>
 
-  <block wx:if="{{ownSurveys.length}}">
+  <block wx:if="{{!needBind && ownSurveys.length}}">
     <view class="section-head">
       <text class="section-head__title">我发布的问卷</text>
       <text class="section-head__count">{{ownSurveys.length}} 份进行中</text>
@@ -68,11 +76,13 @@
     >
       <view class="own-card__main">
         <view class="own-card__title">{{item.title}}</view>
-        <view class="own-card__meta">{{item.statusText}} · 收到 {{item.responseCount}} 份 · {{item.questionCount}} 题</view>
+        <view class="own-card__meta">{{item.statusText}} · 参与 {{item.participantCount}} 人 · {{item.questionCount}} 题</view>
       </view>
       <text class="own-card__action">查看统计 ›</text>
     </view>
   </block>
 
   <view class="home-summary" bindtap="goProfile">{{summaryText}}</view>
+
+  <view wx:if="{{notice}}" class="home-notice">{{notice}}</view>
 </view>

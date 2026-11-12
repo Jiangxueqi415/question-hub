@@ -41,6 +41,32 @@
   color: #2f6fed;
 }
 
+.detail-head__stats {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #8a94a6;
+}
+
+.detail-head__desc {
+  margin-top: 16rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+.detail-over {
+  margin-top: 14rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 12rpx;
+  background: #fff4e5;
+  font-size: 23rpx;
+  line-height: 1.55;
+  color: #c2410c;
+}
+
 .detail-banner {
   margin-top: 20rpx;
   padding: 18rpx 20rpx;
@@ -128,4 +154,13 @@
 .detail-result__actions {
   margin-top: 20rpx;
   display: flex;
+  align-items: center;
+}
+
+.detail-result__button {
+  margin-top: 20rpx;
+}
+
+.detail-result__actions .btn + .btn {
+  margin-left: 16rpx;
 }

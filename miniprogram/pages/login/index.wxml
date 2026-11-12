@@ -12,7 +12,7 @@
 
   <view wx:if="{{checking}}" class="login-loading">正在恢复登录状态…</view>
 
-  <view wx:elif="{{step === 'welcome'}}" class="login-card">
+  <view wx:else class="login-card">
     <view class="login-feature">
       <text class="login-feature__icon">🎯</text>
       <view class="login-feature__body">
@@ -47,50 +47,10 @@
     <view wx:if="{{error}}" class="login-error">{{error}}</view>
 
     <view class="login-note">
-      MVP 演示使用本地 Mock：不采集真实姓名、手机号与 IP；学号仅保存加盐哈希。
+      登录后可在“我的”绑定学号；绑定后才能作答、发布与领取积分。
     </view>
-  </view>
-
-  <view wx:else class="login-card">
-    <view class="login-card__title">绑定学号</view>
-    <view class="login-card__desc">首次使用需要绑定学号，用于领取与发布资格校验。</view>
-
-    <view class="field">
-      <text class="field__label">学号</text>
-      <input
-        class="field__input"
-        type="number"
-        maxlength="12"
-        placeholder="请输入 10–12 位数字"
-        value="{{studentNo}}"
-        bindinput="onStudentNoInput"
-      />
-    </view>
-
-    <view class="field">
-      <text class="field__label">昵称</text>
-      <input
-        class="field__input"
-        maxlength="20"
-        placeholder="2–20 字，默认校园用户"
-        value="{{nickname}}"
-        bindinput="onNicknameInput"
-      />
-    </view>
-
-    <view wx:if="{{error}}" class="login-error">{{error}}</view>
-
-    <button
-      class="btn btn--primary btn--block login-submit"
-      loading="{{loading}}"
-      disabled="{{loading}}"
-      bindtap="onBind"
-    >
-      绑定并进入
-    </button>
-
     <view class="login-note">
-      一个微信只能绑定一个学号；一个学号只能绑定一个账号。学号仅保存加盐哈希，不保存明文。
+      MVP 演示使用本地 Mock：不采集真实姓名、手机号与 IP；学号仅保存加盐哈希。
     </view>
   </view>
 </view>

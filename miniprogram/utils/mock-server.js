@@ -13,13 +13,13 @@
 const constants = require('./constants');
 const format = require('./format');
 const validation = require('./validation');
+const mockData = require('../mock/mock.js');
 
 const STORE_KEY = 'qh_mock_state_v1';
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 const MOCK_TOKEN = 'mock-token';
 const LATENCY_MS = 120;
 const LOG_KEEP = 120;
-const DAY = 24 * 60 * 60 * 1000;
 
 function apiError(code, message) {
   const err = new Error(message || constants.ERROR_MESSAGES[code] || '请求失败');
@@ -43,94 +43,6 @@ function mockHash(value) {
   return 'mock$' + Math.abs(hash).toString(16);
 }
 
-function makeQuestion(id, type, title, options) {
-  return {
-    id: id,
-    type: type,
-    title: title,
-    sort: 0,
-    options: (options || []).map(function (text, index) {
-      return { id: id + '_o' + (index + 1), text: text, sort: index };
-    })
-  };
-}
-
-function makeSeedSurvey(id, ownerId, ownerName, title, category, minutes, questions, createdAt, startAt, endAt) {
-  return {
-    id: id,
-    ownerId: ownerId,
-    ownerName: ownerName,
-    title: title,
-    category: category,
-    minutes: minutes,
-    startAt: startAt,
-    endAt: endAt,
-    status: 'open',
-    createdAt: createdAt,
-    questions: questions
-  };
-}
-
-function createSeedSurveys(now) {
-  const startAt = now - 30 * DAY;
-  const endAt = now + 30 * DAY;
-
-  const survey1 = makeSeedSurvey(
-    's1',
-    'u_demo_1',
-    '林同学',
-    '大学生网购消费习惯调查',
-    '生活服务',
-    3,
-    [
-      makeQuestion('s1q1', 'single', '你平均每月网购几次？', ['1-2 次', '3-5 次', '6-10 次', '10 次以上']),
-      makeQuestion('s1q2', 'single', '你常用的购物平台是？', ['淘宝 / 天猫', '京东', '拼多多', '抖音 / 快手']),
-      makeQuestion('s1q3', 'single', '你单次网购的平均金额是？', ['50 元以内', '50-200 元', '200-500 元', '500 元以上']),
-      makeQuestion('s1q4', 'single', '影响你下单的主要因素是？', ['价格优惠', '商品评价', '物流速度', '品牌口碑'])
-    ],
-    now - 60 * 1000,
-    startAt,
-    endAt
-  );
-
-  const survey2 = makeSeedSurvey(
-    's2',
-    'u_demo_2',
-    '周同学',
-    '关于校园食堂满意度的调研',
-    '学习调研',
-    2,
-    [
-      makeQuestion('s2q1', 'single', '你每周在食堂就餐几次？', ['1-3 次', '4-6 次', '7-10 次', '10 次以上']),
-      makeQuestion('s2q2', 'single', '你对食堂菜品的口味满意吗？', ['非常满意', '比较满意', '一般', '不满意']),
-      makeQuestion('s2q3', 'multiple', '你最希望食堂改进什么？（可多选）', ['口味', '价格', '卫生', '排队效率', '营业时间']),
-      makeQuestion('s2q4', 'open', '你对食堂还有什么建议？', [])
-    ],
-    now - 120 * 1000,
-    startAt,
-    endAt
-  );
-
-  const survey3 = makeSeedSurvey(
-    's3',
-    'u_demo_3',
-    '陈同学',
-    '社团活动参与意愿调查',
-    '社团活动',
-    4,
-    [
-      makeQuestion('s3q1', 'single', '你目前参加了几个社团？', ['0 个', '1 个', '2 个', '3 个及以上']),
-      makeQuestion('s3q2', 'multiple', '你更愿意参加哪类社团活动？（可多选）', ['学术讲座', '志愿服务', '文体比赛', '户外拓展']),
-      makeQuestion('s3q3', 'open', '你希望社团增加什么活动？', [])
-    ],
-    now - 180 * 1000,
-    startAt,
-    endAt
-  );
-
-  return [survey1, survey2, survey3];
-}
-
 function createState() {
   const now = Date.now();
   return {
@@ -148,7 +60,7 @@ function createState() {
       createdAt: now
     },
     boundHashes: {},
-    surveys: createSeedSurveys(now),
+    surveys: mockData.createMockSurveys(now),
     attempts: [],
     responses: [],
     pointLedger: [],
@@ -205,7 +117,7 @@ function publicUser(state) {
 
 function requireBound(state) {
   if (!state.user.bound) {
-    throw apiError('AUTH_REQUIRED', '请先登录并绑定学号');
+    throw apiError('STUDENT_NOT_BOUND', '请先在“我的”绑定学号');
   }
 }
 
@@ -243,6 +155,24 @@ function findAttempt(state, attemptId, surveyId, userId) {
     }
   }
   return null;
+}
+
+function hasSeedStats(survey) {
+  return !!(survey && survey.seedStats && Object.keys(survey.seedStats).length);
+}
+
+function countSurveyResponses(state, surveyId) {
+  return state.responses.filter(function (response) {
+    return String(response.surveyId) === String(surveyId) && response.status !== 'expired';
+  }).length;
+}
+
+function hasAnyResponse(state, surveyId) {
+  return countSurveyResponses(state, surveyId) > 0;
+}
+
+function participantCountOf(state, survey) {
+  return (Number(survey.participantCount) || 0) + countSurveyResponses(state, survey.id);
 }
 
 function pushPointLedger(state, delta, reason, surveyId) {
@@ -310,11 +240,20 @@ function bind(state, data) {
   state.user.studentHash = studentHash;
   state.user.nickname = checked.value.nickname;
   state.user.bound = true;
+  syncOwnedSurveyOwnerName(state);
   return {
     token: MOCK_TOKEN,
     user: publicUser(state),
     needBind: false
   };
+}
+
+function syncOwnedSurveyOwnerName(state) {
+  state.surveys.forEach(function (survey) {
+    if (survey.ownerId === state.user.id) {
+      survey.ownerName = state.user.nickname;
+    }
+  });
 }
 
 function updateNickname(state, data) {
@@ -323,6 +262,7 @@ function updateNickname(state, data) {
     throw apiError('INVALID_PARAMS', checked.message);
   }
   state.user.nickname = checked.value;
+  syncOwnedSurveyOwnerName(state);
   return { user: publicUser(state) };
 }
 
@@ -354,13 +294,16 @@ function listSurveys(state) {
       return {
         id: survey.id,
         title: survey.title,
+        description: survey.description || '',
         ownerName: survey.ownerName,
         category: survey.category,
         minutes: survey.minutes,
         questionCount: survey.questions.length,
+        participantCount: participantCountOf(state, survey),
         reward: constants.REWARD_POINTS,
         startAt: survey.startAt,
         endAt: survey.endAt,
+        createdAt: survey.createdAt,
         status: 'open',
         mine: false
       };
@@ -372,17 +315,24 @@ function getSurveyDetail(state, id) {
   if (!survey) {
     throw apiError('SURVEY_NOT_FOUND');
   }
+  const mine = survey.ownerId === state.user.id;
   return {
     id: survey.id,
     title: survey.title,
+    description: survey.description || '',
+    ownerId: survey.ownerId,
     ownerName: survey.ownerName,
     category: survey.category,
     minutes: survey.minutes,
     reward: constants.REWARD_POINTS,
     startAt: survey.startAt,
     endAt: survey.endAt,
+    createdAt: survey.createdAt,
+    participantCount: participantCountOf(state, survey),
+    responseCount: countSurveyResponses(state, survey.id),
+    hasResponses: mine ? hasAnyResponse(state, survey.id) || hasSeedStats(survey) : false,
     status: effectiveStatus(survey, Date.now()),
-    mine: survey.ownerId === state.user.id,
+    mine: mine,
     questions: survey.questions.map(function (question) {
       return {
         id: question.id,
@@ -394,6 +344,38 @@ function getSurveyDetail(state, id) {
       };
     })
   };
+}
+
+function buildQuestionObjects(rawQuestions, now) {
+  return (rawQuestions || []).map(function (question, qIndex) {
+    const stamp = now.toString(36) + '_' + Math.random().toString(36).slice(2, 5) + '_' + qIndex;
+    return {
+      id: 'q_' + stamp,
+      type: question.type,
+      title: question.title,
+      sort: qIndex,
+      options: (question.options || []).map(function (text, oIndex) {
+        return {
+          id: 'o_' + stamp + '_' + oIndex,
+          text: text,
+          sort: oIndex
+        };
+      })
+    };
+  });
+}
+
+function questionSignature(questions) {
+  return (questions || [])
+    .map(function (question) {
+      const options = (question.options || [])
+        .map(function (option) {
+          return typeof option === 'string' ? option : option.text;
+        })
+        .join('\u0001');
+      return [question.type, question.title, options].join('\u0002');
+    })
+    .join('\u0003');
 }
 
 function createSurvey(state, data) {
@@ -421,27 +403,16 @@ function createSurvey(state, data) {
     ownerId: state.user.id,
     ownerName: state.user.nickname,
     title: checked.value.title,
+    description: checked.value.description || '',
     category: checked.value.category,
     minutes: checked.value.minutes,
     startAt: checked.value.startAt,
     endAt: checked.value.endAt,
     status: 'open',
     createdAt: now,
-    questions: checked.value.questions.map(function (question, qIndex) {
-      return {
-        id: 'q_' + now.toString(36) + '_' + qIndex,
-        type: question.type,
-        title: question.title,
-        sort: qIndex,
-        options: question.options.map(function (text, oIndex) {
-          return {
-            id: 'o_' + now.toString(36) + '_' + qIndex + '_' + oIndex,
-            text: text,
-            sort: oIndex
-          };
-        })
-      };
-    })
+    participantCount: 0,
+    seedStats: {},
+    questions: buildQuestionObjects(checked.value.questions, now)
   };
 
   state.surveys.push(survey);
@@ -455,6 +426,143 @@ function createSurvey(state, data) {
   };
   if (requestId) state.requests[requestId] = result;
   return result;
+}
+
+function updateSurvey(state, id, data) {
+  const survey = findSurvey(state, id);
+  if (!survey) {
+    throw apiError('SURVEY_NOT_FOUND');
+  }
+  if (survey.ownerId !== state.user.id) {
+    throw apiError('FORBIDDEN', '只能编辑自己发布的问卷');
+  }
+
+  const checked = validation.normalizeSurvey(data);
+  if (!checked.ok) {
+    throw apiError('INVALID_PARAMS', checked.message);
+  }
+
+  const hasResponses = hasAnyResponse(state, survey.id) || hasSeedStats(survey);
+  if (hasResponses && questionSignature(survey.questions) !== questionSignature(checked.value.questions)) {
+    throw apiError('SURVEY_HAS_RESPONSES', '该问卷已有作答，题目不可修改；可修改标题、简介和时间');
+  }
+
+  survey.title = checked.value.title;
+  survey.description = checked.value.description || '';
+  survey.category = checked.value.category;
+  survey.minutes = checked.value.minutes;
+  survey.startAt = checked.value.startAt;
+  survey.endAt = checked.value.endAt;
+  if (!hasResponses) {
+    survey.questions = buildQuestionObjects(checked.value.questions, Date.now());
+  }
+
+  return {
+    id: survey.id,
+    survey: getSurveyDetail(state, survey.id),
+    points: state.user.points,
+    credit: state.user.credit
+  };
+}
+
+function closeSurvey(state, id) {
+  const survey = findSurvey(state, id);
+  if (!survey) {
+    throw apiError('SURVEY_NOT_FOUND');
+  }
+  if (survey.ownerId !== state.user.id) {
+    throw apiError('FORBIDDEN', '只能下架自己发布的问卷');
+  }
+  survey.status = 'closed';
+  return getSurveyDetail(state, survey.id);
+}
+
+function getSurveyStats(state, id) {
+  const survey = findSurvey(state, id);
+  if (!survey) {
+    throw apiError('SURVEY_NOT_FOUND');
+  }
+  if (survey.ownerId !== state.user.id) {
+    throw apiError('FORBIDDEN', '只能查看自己发布问卷的统计');
+  }
+
+  const responses = state.responses.filter(function (response) {
+    return String(response.surveyId) === String(survey.id) && response.status !== 'expired';
+  });
+
+  const questions = survey.questions.map(function (question) {
+    const base = (survey.seedStats && survey.seedStats[question.id]) || null;
+
+    if (question.type === 'open') {
+      const answers = base && base.answers ? base.answers.slice() : [];
+      responses.forEach(function (response) {
+        const value = response.answers && response.answers[question.id];
+        if (typeof value === 'string' && value.trim()) {
+          answers.push(value.trim());
+        }
+      });
+      return {
+        id: question.id,
+        type: question.type,
+        title: question.title,
+        total: answers.length,
+        selectionTotal: answers.length,
+        options: [],
+        answers: answers
+      };
+    }
+
+    const counts = question.options.map(function (option, index) {
+      return base && base.counts && Number(base.counts[index]) ? Number(base.counts[index]) : 0;
+    });
+    let total = base && Number(base.total) ? Number(base.total) : 0;
+
+    responses.forEach(function (response) {
+      const value = response.answers && response.answers[question.id];
+      if (question.type === 'single' && Number.isInteger(value) && counts[value] != null) {
+        counts[value] += 1;
+        total += 1;
+      } else if (question.type === 'multiple' && Array.isArray(value) && value.length) {
+        value.forEach(function (index) {
+          if (counts[index] != null) counts[index] += 1;
+        });
+        total += 1;
+      }
+    });
+
+    const selectionTotal = counts.reduce(function (sum, count) {
+      return sum + count;
+    }, 0);
+
+    return {
+      id: question.id,
+      type: question.type,
+      title: question.title,
+      total: total,
+      selectionTotal: selectionTotal,
+      options: question.options.map(function (option, index) {
+        return {
+          text: option.text,
+          count: counts[index],
+          percent: total ? Math.round((counts[index] / total) * 1000) / 10 : 0
+        };
+      }),
+      answers: []
+    };
+  });
+
+  const status = effectiveStatus(survey, Date.now());
+  return {
+    id: survey.id,
+    title: survey.title,
+    description: survey.description || '',
+    status: status,
+    statusText: status === 'open' ? '进行中' : '已截止',
+    participantCount: (Number(survey.participantCount) || 0) + responses.length,
+    responseCount: responses.length,
+    hasResponses: responses.length > 0 || hasSeedStats(survey),
+    questions: questions
+  };
 }
 
 function startSurvey(state, id) {
@@ -579,8 +687,9 @@ function openAnswerInvalid(text) {
 }
 
 /**
- * 质量核验（PRD 6.5）：
+ * 质量核验（PRD 6.5 + 本轮补充规则）：
  * - 未答率 > 20%：incomplete
+ * - 作答时间 <= 2 秒：直接判 invalid（不发积分/信誉）
  * - 否则收集 flags：fast / straight / open_invalid
  * - flags >= 2：invalid；flags <= 1：valid（1 个 flag 只做记录）
  */
@@ -595,6 +704,15 @@ function evaluateQuality(survey, answers, attempt, now) {
     return {
       status: 'incomplete',
       flags: [],
+      missedCount: missedCount,
+      elapsedSeconds: elapsedSeconds
+    };
+  }
+
+  if (elapsedSeconds <= constants.QUALITY.FAST_INVALID_SECONDS) {
+    return {
+      status: 'invalid',
+      flags: ['fast'],
       missedCount: missedCount,
       elapsedSeconds: elapsedSeconds
     };
@@ -673,7 +791,10 @@ function statusMessage(status, flags, missedCount) {
     return '提交成功：+5 积分、+5 信誉分';
   }
   if (status === 'invalid') {
-    return '未通过质量核验：' + labels.join('、') + '。本次不计积分。';
+    if (flags.indexOf('fast') !== -1) {
+      return '未通过质量核验：作答时间过短。本次不计积分和信誉分，请认真作答。';
+    }
+    return '未通过质量核验：' + labels.join('、') + '。本次不计积分和信誉分。';
   }
   if (status === 'incomplete') {
     return '未答完：还有 ' + missedCount + ' 题未答。本次不计积分，信誉 -5。';
@@ -892,21 +1013,25 @@ function getMySurveys(state) {
         return item.status === 'expired';
       }).length;
       const status = effectiveStatus(survey, now);
+      const responseCount = validCount + invalidCount + incompleteCount;
       return {
         id: survey.id,
         title: survey.title,
+        description: survey.description || '',
         category: survey.category,
         status: status,
         statusText: status === 'open' ? '进行中' : '已截止',
         questionCount: survey.questions.length,
+        participantCount: (Number(survey.participantCount) || 0) + responseCount,
         startAt: survey.startAt,
         endAt: survey.endAt,
         createdAt: survey.createdAt,
-        responseCount: validCount + invalidCount + incompleteCount,
+        responseCount: responseCount,
         validCount: validCount,
         invalidCount: invalidCount,
         incompleteCount: incompleteCount,
-        expiredCount: expiredCount
+        expiredCount: expiredCount,
+        hasResponses: responseCount > 0 || hasSeedStats(survey)
       };
     });
 }
@@ -971,11 +1096,30 @@ function route(state, options) {
     throw apiError('NOT_FOUND');
   }
 
-  // 已登录未绑定学号也允许读取自己的状态（PRD 3.2：可浏览，不能发布/作答/领取）
+  // 未绑定学号也可以浏览：/me、问卷列表与问卷详情
   if (method === 'GET' && path === '/me') {
     return publicUser(state);
   }
+  if (method === 'GET' && path === '/me/ledger') {
+    if (!state.user.bound) return [];
+    return getLedger(state, query.type === 'credit' ? 'credit' : 'points');
+  }
+  if (method === 'GET' && path === '/me/surveys') {
+    if (!state.user.bound) return [];
+    return getMySurveys(state);
+  }
+  if (method === 'GET' && path === '/me/responses') {
+    if (!state.user.bound) return [];
+    return getMyResponses(state);
+  }
+  if (method === 'GET' && path === '/surveys') {
+    return listSurveys(state);
+  }
+  if (segments[0] === 'surveys' && segments.length === 2 && method === 'GET') {
+    return getSurveyDetail(state, decodeURIComponent(segments[1]));
+  }
 
+  // 以下操作需要先绑定学号
   requireBound(state);
 
   if (method === 'PATCH' && path === '/me') {
@@ -984,33 +1128,26 @@ function route(state, options) {
   if (method === 'POST' && path === '/me/onboard') {
     return onboard(state);
   }
-  if (method === 'GET' && path === '/me/ledger') {
-    return getLedger(state, query.type === 'credit' ? 'credit' : 'points');
-  }
-  if (method === 'GET' && path === '/me/surveys') {
-    return getMySurveys(state);
-  }
-  if (method === 'GET' && path === '/me/responses') {
-    return getMyResponses(state);
-  }
-
-  if (method === 'GET' && path === '/surveys') {
-    return listSurveys(state);
-  }
   if (method === 'POST' && path === '/surveys') {
     return createSurvey(state, data);
   }
 
   if (segments[0] === 'surveys' && segments.length >= 2) {
     const surveyId = decodeURIComponent(segments[1]);
-    if (method === 'GET' && segments.length === 2) {
-      return getSurveyDetail(state, surveyId);
+    if (method === 'GET' && segments.length === 3 && segments[2] === 'stats') {
+      return getSurveyStats(state, surveyId);
+    }
+    if (method === 'PATCH' && segments.length === 2) {
+      return updateSurvey(state, surveyId, data);
     }
     if (method === 'POST' && segments.length === 3 && segments[2] === 'start') {
       return startSurvey(state, surveyId);
     }
     if (method === 'POST' && segments.length === 3 && segments[2] === 'submit') {
       return submitSurvey(state, surveyId, data);
+    }
+    if (method === 'POST' && segments.length === 3 && segments[2] === 'close') {
+      return closeSurvey(state, surveyId);
     }
   }
 

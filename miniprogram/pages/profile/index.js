@@ -18,6 +18,7 @@ function formatSurveys(list) {
   return (list || []).map(function (survey) {
     return Object.assign({}, survey, {
       deadlineText: format.formatShort(survey.endAt) + ' 截止',
+      participantText: '参与 ' + (survey.participantCount || 0) + ' 人',
       tagClass: survey.status === 'open' ? 'tag--green' : 'tag--gray'
     });
   });
@@ -53,6 +54,11 @@ Page({
     loading: true,
     logLoading: false,
     mockMode: config.useMock,
+    needBind: false,
+    bindStudentNo: '',
+    bindNickname: '校园用户',
+    bindError: '',
+    bindLoading: false,
     me: {
       nickname: '校园用户',
       points: 0,
@@ -85,31 +91,48 @@ Page({
   loadData(fromPullDown) {
     if (this._loading) return;
     this._loading = true;
-    const logType = this.data.logType;
     this.setData({ loading: true });
 
-    Promise.all([api.getMe(), api.getLedger(logType), api.getMySurveys(), api.getMyResponses()])
-      .then((result) => {
-        const me = result[0];
-        if (me.bound === false) {
-          wx.reLaunch({ url: '/pages/login/index' });
-          return;
-        }
+    const logType = this.data.logType;
+
+    api.getMe()
+      .then((me) => {
         const app = getApp();
         app.updateUser(me);
 
-        const patch = {
-          loading: false,
-          me: me,
-          avatarText: (me.nickname || '校园用户').slice(0, 1),
-          mySurveys: formatSurveys(result[2]),
-          myResponses: formatResponses(result[3])
-        };
-        // 用户可能在首屏加载期间切换了流水 tab，避免旧请求覆盖新选择
-        if (logType === this.data.logType) {
-          patch.logs = formatLogs(result[1]);
+        if (!me.bound) {
+          this.setData({
+            loading: false,
+            needBind: true,
+            me: me,
+            avatarText: (me.nickname || '校园用户').slice(0, 1),
+            bindNickname: this.data.bindNickname || me.nickname || '校园用户'
+          });
+          return null;
         }
-        this.setData(patch);
+
+        this.setData({
+          needBind: false,
+          bindError: '',
+          me: me,
+          avatarText: (me.nickname || '校园用户').slice(0, 1)
+        });
+
+        return Promise.all([
+          api.getLedger(logType),
+          api.getMySurveys(),
+          api.getMyResponses()
+        ]).then((result) => {
+          const patch = {
+            loading: false,
+            mySurveys: formatSurveys(result[1]),
+            myResponses: formatResponses(result[2])
+          };
+          if (logType === this.data.logType) {
+            patch.logs = formatLogs(result[0]);
+          }
+          this.setData(patch);
+        });
       })
       .catch((err) => {
         this.setData({ loading: false });
@@ -119,6 +142,47 @@ Page({
         this._loading = false;
         if (fromPullDown) wx.stopPullDownRefresh();
       }.bind(this));
+  },
+
+  onBindStudentInput(e) {
+    this.setData({ bindStudentNo: e.detail.value || '', bindError: '' });
+  },
+
+  onBindNicknameInput(e) {
+    this.setData({ bindNickname: e.detail.value || '', bindError: '' });
+  },
+
+  onBindSubmit() {
+    if (this.data.bindLoading) return;
+    const checked = validation.validateBind({
+      studentNo: this.data.bindStudentNo,
+      nickname: this.data.bindNickname
+    });
+    if (!checked.ok) {
+      this.setData({ bindError: checked.message });
+      return;
+    }
+
+    this.setData({ bindLoading: true, bindError: '' });
+    api.bind(checked.value)
+      .then((res) => {
+        const app = getApp();
+        app.setSession(res.token, res.user);
+        this.setData({
+          bindLoading: false,
+          needBind: false,
+          me: res.user,
+          avatarText: (res.user.nickname || '校园用户').slice(0, 1)
+        });
+        wx.showToast({ title: '绑定成功', icon: 'success' });
+        this.loadData();
+      })
+      .catch((err) => {
+        this.setData({
+          bindLoading: false,
+          bindError: (err && err.message) || '绑定失败，请重试'
+        });
+      });
   },
 
   onSwitchLog(e) {
@@ -207,19 +271,9 @@ Page({
 
   onMySurveyTap(e) {
     const id = e.currentTarget.dataset.id;
-    const survey = this.data.mySurveys.filter(function (item) {
-      return String(item.id) === String(id);
-    })[0];
-    if (!survey) return;
-
-    wx.showModal({
-      title: survey.title,
-      content:
-        '状态：' + survey.statusText + '\n' +
-        '收到作答：' + survey.responseCount + ' 份（有效 ' + survey.validCount + ' / 未通过 ' + survey.invalidCount + ' / 未答完 ' + survey.incompleteCount + '）\n' +
-        '统计详情页为 P1 功能，MVP 阶段先在这里查看回收数量。',
-      showCancel: false,
-      confirmText: '知道了'
+    if (!id) return;
+    wx.navigateTo({
+      url: '/pages/stats/index?id=' + encodeURIComponent(id) + '&mode=pie'
     });
   },
 

@@ -49,6 +49,11 @@ function normalizeSurvey(input) {
     return { ok: false, message: '请选择有效的分类' };
   }
 
+  const description = trim(data.description);
+  if (description.length > constants.DESCRIPTION_MAX_LEN) {
+    return { ok: false, message: '问卷简介最多 ' + constants.DESCRIPTION_MAX_LEN + ' 个字' };
+  }
+
   const minutes = parseInt(data.minutes, 10);
   if (isNaN(minutes) || minutes < constants.MINUTES_MIN || minutes > constants.MINUTES_MAX) {
     return { ok: false, message: '预计耗时需为 1–60 分钟' };
@@ -125,6 +130,7 @@ function normalizeSurvey(input) {
     ok: true,
     value: {
       title: title,
+      description: description,
       category: category,
       minutes: minutes,
       startAt: startAt,

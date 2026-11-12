@@ -225,3 +225,39 @@
   line-height: 1.5;
   color: #b0b7c3;
 }
+
+.bind-card {
+  margin-bottom: 20rpx;
+}
+
+.bind-card__title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.bind-card__desc {
+  margin: 10rpx 0 30rpx;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #8a94a6;
+}
+
+.bind-submit {
+  margin-top: 28rpx;
+}
+
+.bind-note {
+  margin-top: 18rpx;
+  text-align: center;
+  font-size: 21rpx;
+  line-height: 1.6;
+  color: #9ca3af;
+}
+
+.section-note {
+  margin: -6rpx 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #9ca3af;
+}

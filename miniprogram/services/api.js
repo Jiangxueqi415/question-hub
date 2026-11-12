@@ -64,6 +64,22 @@ const api = {
       method: 'POST',
       data: payload
     });
+  },
+
+  getSurveyStats(id) {
+    return request({ url: '/surveys/' + encodeURIComponent(id) + '/stats' });
+  },
+
+  updateSurvey(id, payload) {
+    return request({
+      url: '/surveys/' + encodeURIComponent(id),
+      method: 'PATCH',
+      data: payload
+    });
+  },
+
+  closeSurvey(id) {
+    return request({ url: '/surveys/' + encodeURIComponent(id) + '/close', method: 'POST' });
   }
 };
 

@@ -3,6 +3,8 @@ const api = require('../../services/api');
 Page({
   data: {
     loading: true,
+    needBind: false,
+    notice: '',
     me: {
       nickname: '校园用户',
       points: 0,
@@ -20,7 +22,28 @@ Page({
   onShow() {
     const app = getApp();
     if (!app.requireLogin()) return;
+    this.showNotice();
     this.loadData();
+  },
+
+  showNotice() {
+    let notice = '';
+    try {
+      notice = wx.getStorageSync('qh_home_notice') || '';
+    } catch (err) {
+      notice = '';
+    }
+    if (!notice) return;
+    try {
+      wx.removeStorageSync('qh_home_notice');
+    } catch (err) {
+      // 忽略
+    }
+    this.setData({ notice: notice });
+    if (this._noticeTimer) clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => {
+      this.setData({ notice: '' });
+    }, 4000);
   },
 
   onPullDownRefresh() {
@@ -70,6 +93,7 @@ Page({
 
         this.setData({
           loading: false,
+          needBind: me.bound === false,
           me: me,
           pendingSurveys: pendingSurveys,
           ownSurveys: mySurveys.filter(function (survey) {
@@ -102,18 +126,9 @@ Page({
 
   onOwnSurveyTap(e) {
     const id = e.currentTarget.dataset.id;
-    const survey = this.data.ownSurveys.filter(function (item) {
-      return String(item.id) === String(id);
-    })[0];
-    if (!survey) return;
-
-    wx.showModal({
-      title: survey.title,
-      content:
-        '已收到 ' + survey.responseCount + ' 份作答（有效 ' + survey.validCount + ' 份）。' +
-        '统计详情页为 P1 功能，MVP 阶段先在个人中心查看回收数量。',
-      showCancel: false,
-      confirmText: '知道了'
+    if (!id) return;
+    wx.navigateTo({
+      url: '/pages/stats/index?id=' + encodeURIComponent(id) + '&mode=bar'
     });
   },
 

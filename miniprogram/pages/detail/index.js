@@ -28,10 +28,13 @@ Page({
     answeredCount: 0,
     readonly: false,
     own: false,
+    needBind: false,
     showRecordAction: false,
     attemptId: '',
     startedAt: 0,
     submitting: false,
+    confirming: false,
+    overExpected: false,
     status: '',
     banner: '',
     bannerTone: 'info',
@@ -81,22 +84,33 @@ Page({
       return;
     }
 
-    api.getSurvey(this.surveyId)
-      .then((survey) => {
+    Promise.all([api.getSurvey(this.surveyId), api.getMe()])
+      .then((result) => {
+        const survey = result[0];
+        const me = result[1];
         this.survey = survey;
+
         const view = Object.assign({}, survey, {
           startText: format.formatDateTime(survey.startAt),
-          endText: format.formatDateTime(survey.endAt)
+          endText: format.formatDateTime(survey.endAt),
+          createdText: format.formatDateTime(survey.createdAt),
+          participantCount: survey.participantCount || 0
         });
+
         this.setData({
           loading: false,
           survey: view,
           questions: this.decorateQuestions(survey),
           total: survey.questions.length,
-          status: survey.status
+          status: survey.status,
+          needBind: me.bound === false
         });
         this.refreshSubmitState();
 
+        if (me.bound === false) {
+          this.setupUnbound();
+          return null;
+        }
         if (survey.mine) {
           this.setupOwn();
           return null;
@@ -145,6 +159,8 @@ Page({
           attemptId: res.attemptId,
           startedAt: res.startedAt,
           readonly: false,
+          confirming: false,
+          overExpected: false,
           banner: '',
           bannerTone: 'info'
         });
@@ -163,17 +179,42 @@ Page({
           this.setupBlocked(err.message);
           return;
         }
+        if (err && err.code === 'STUDENT_NOT_BOUND') {
+          this.setupUnbound();
+          return;
+        }
         wx.showToast({ title: (err && err.message) || '无法进入作答', icon: 'none' });
         this.setupBlocked('无法进入作答，请返回首页重试', '无法作答');
       });
   },
 
+  setupUnbound() {
+    this.setData({
+      needBind: true,
+      readonly: true,
+      startedAt: 0,
+      confirming: false,
+      overExpected: false,
+      banner: '请先在“我的”绑定学号后再作答。',
+      bannerTone: 'gray',
+      submitText: '未绑定学号',
+      submitDisabled: true,
+      submitGreen: false,
+      submitHint: '',
+      resultTitle: '未绑定学号',
+      resultDesc: '绑定学号后即可作答、领取积分和发布问卷。',
+      showRecordAction: false
+    });
+  },
+
   setupOwn() {
     this.setData({
       own: true,
+      needBind: false,
       readonly: true,
-      showRecordAction: false,
       startedAt: 0,
+      confirming: false,
+      overExpected: false,
       banner: '这是你发布的问卷，发布者不能作答自己的问卷。',
       bannerTone: 'gray',
       submitText: '发布者不可作答',
@@ -181,15 +222,18 @@ Page({
       submitGreen: false,
       submitHint: '',
       resultTitle: '发布者视角',
-      resultDesc: '统计详情页为 P1 功能；MVP 阶段可在个人中心查看回收数量与有效份数。'
+      resultDesc: '可以查看每一题的答题统计，也可以编辑或下架这份问卷。',
+      showRecordAction: false
     });
   },
 
   setupBlocked(message, title) {
     this.setData({
       readonly: true,
+      needBind: false,
       startedAt: 0,
-      showRecordAction: false,
+      confirming: false,
+      overExpected: false,
       banner: message || '问卷已截止，无法作答。',
       bannerTone: 'gray',
       submitText: '问答已截止，作答无效',
@@ -197,7 +241,8 @@ Page({
       submitGreen: false,
       submitHint: '',
       resultTitle: title || '问卷已截止',
-      resultDesc: '该问卷当前不可作答，已提交的记录仍可在个人中心查看。'
+      resultDesc: '该问卷当前不可作答，已提交的记录仍可在个人中心查看。',
+      showRecordAction: false
     });
   },
 
@@ -233,7 +278,10 @@ Page({
 
     this.setData({
       readonly: true,
+      needBind: false,
       startedAt: 0,
+      confirming: false,
+      overExpected: false,
       showRecordAction: true,
       questions: questions,
       answeredCount: answeredCount,
@@ -260,11 +308,16 @@ Page({
     let submitHint = '';
 
     if (answered > 0 && answered < total) {
-      submitText = '提交问卷（还差 ' + (total - answered) + ' 题）';
-      submitDisabled = false;
       submitGreen = true;
-      submitHint = '还有题目未答，提交前会二次确认；提交后不可修改。';
-    } else if (answered > 0 && answered === total) {
+      submitDisabled = false;
+      if (this.data.confirming) {
+        submitText = '再次点击确认提交';
+        submitHint = '您还有 ' + (total - answered) + ' 题未作答，确认提交？';
+      } else {
+        submitText = '提交问卷（还差 ' + (total - answered) + ' 题）';
+        submitHint = '还有题目未答，提交前会提示确认；提交后不可修改。';
+      }
+    } else if (total > 0 && answered === total) {
       submitText = '提交问卷并领取积分';
       submitDisabled = false;
       submitGreen = true;
@@ -287,8 +340,20 @@ Page({
     const value = e.detail.value;
     const questions = this.data.questions.slice();
     questions[index] = Object.assign({}, questions[index], { value: value });
-    this.setData({ questions: questions });
+    this.setData({
+      questions: questions,
+      confirming: false
+    });
     this.refreshSubmitState(questions);
+  },
+
+  onTimerTick(e) {
+    const seconds = Number(e.detail && e.detail.seconds) || 0;
+    const minutes = Number(this.data.survey && this.data.survey.minutes) || 0;
+    const over = minutes > 0 && seconds > minutes * 60;
+    if (over !== this.data.overExpected) {
+      this.setData({ overExpected: over });
+    }
   },
 
   buildAnswers() {
@@ -318,16 +383,9 @@ Page({
     }
 
     const unanswered = this.data.total - this.data.answeredCount;
-    if (unanswered > 0) {
-      wx.showModal({
-        title: '还有题目未答',
-        content: '还有 ' + unanswered + ' 题未答，确定提交？提交后不可修改。',
-        confirmText: '确定提交',
-        cancelText: '继续作答',
-        success: (res) => {
-          if (res.confirm) this.doSubmit();
-        }
-      });
+    if (unanswered > 0 && !this.data.confirming) {
+      this.setData({ confirming: true });
+      this.refreshSubmitState();
       return;
     }
 
@@ -368,12 +426,17 @@ Page({
           });
           return;
         }
+        if (err && err.code === 'STUDENT_NOT_BOUND') {
+          this.setupUnbound();
+          return;
+        }
         wx.showToast({ title: (err && err.message) || '提交失败', icon: 'none' });
       });
   },
 
   showSubmitResult(result) {
     const status = result.status;
+    const flags = result.flags || [];
     const tone = status === 'valid' ? 'success' : status === 'invalid' ? 'danger' : 'warn';
     const titleMap = {
       valid: '已完成填写',
@@ -383,9 +446,20 @@ Page({
     };
     const message = result.message || '';
 
+    if (flags.indexOf('fast') !== -1) {
+      try {
+        wx.setStorageSync('qh_home_notice', '请认真作答');
+      } catch (err) {
+        // 忽略存储异常
+      }
+    }
+
     this.setData({
       readonly: true,
+      needBind: false,
       startedAt: 0,
+      confirming: false,
+      overExpected: false,
       showRecordAction: true,
       status: status,
       banner: message,
@@ -398,14 +472,30 @@ Page({
       resultDesc: message
     });
 
+    // 正常有效提交与 2 秒内的快速提交：直接回首页（快速提交会在首页提示“请认真作答”）
+    if (status === 'valid' || flags.indexOf('fast') !== -1) {
+      wx.showToast({ title: message, icon: 'none', duration: 1800 });
+      setTimeout(function () {
+        wx.switchTab({ url: '/pages/home/index' });
+      }, 900);
+      return;
+    }
+
     wx.showModal({
-      title: status === 'valid' ? '提交成功' : '提交结果',
+      title: '提交结果',
       content: message,
       showCancel: false,
       confirmText: '返回首页',
       success: function () {
         wx.switchTab({ url: '/pages/home/index' });
       }
+    });
+  },
+
+  onViewStats() {
+    if (!this.surveyId) return;
+    wx.navigateTo({
+      url: '/pages/stats/index?id=' + encodeURIComponent(this.surveyId) + '&mode=bar'
     });
   },
 

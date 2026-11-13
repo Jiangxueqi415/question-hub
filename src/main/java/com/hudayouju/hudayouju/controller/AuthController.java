@@ -2,6 +2,8 @@ package com.hudayouju.hudayouju.controller;
 
 import com.hudayouju.hudayouju.common.Result;
 import com.hudayouju.hudayouju.model.User;
+import com.hudayouju.hudayouju.repository.CreditLedgerRepository;
+import com.hudayouju.hudayouju.repository.PointLedgerRepository;
 import com.hudayouju.hudayouju.repository.UserRepository;
 import com.hudayouju.hudayouju.util.HashUtil;
 import com.hudayouju.hudayouju.util.JwtUtil;
@@ -15,14 +17,19 @@ import java.util.Map;
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final PointLedgerRepository pointLedgerRepository;
+    private final CreditLedgerRepository creditLedgerRepository;
 
-    public AuthController(UserRepository userRepository) {
+    public AuthController(UserRepository userRepository,
+                          PointLedgerRepository pointLedgerRepository,
+                          CreditLedgerRepository creditLedgerRepository) {
         this.userRepository = userRepository;
+        this.pointLedgerRepository = pointLedgerRepository;
+        this.creditLedgerRepository = creditLedgerRepository;
     }
 
     @PostMapping("/login")
     public Result<Object> login(@RequestBody Map<String, String> body) {
-        System.out.println("========== 进来了 login 接口 ==========");
         String openid = body.getOrDefault("mockOpenid", "mock_openid_123");
         var optionalUser = userRepository.findByOpenid(openid);
 
@@ -44,8 +51,6 @@ public class AuthController {
 
     @PostMapping("/bind")
     public Result<Object> bind(@RequestBody Map<String, String> body) {
-        System.out.println("========== 进来了 bind 接口 ==========");
-
         String openid = body.get("openid");
         String studentNo = body.get("studentNo");
         String nickname = body.get("nickname");
@@ -73,5 +78,34 @@ public class AuthController {
         data.put("token", token);
         data.put("user", newUser);
         return Result.success(data);
+    }
+
+    // 查流水接口（直接从 Header 解析 Token，不走拦截器传参）
+    @GetMapping("/ledger")
+    public Result<Object> getLedger(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // 1. 检查 Token
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error(401, "未提供 Token 或格式错误");
+        }
+
+        try {
+            // 2. 解析 Token 拿到 openid
+            String token = authHeader.substring(7);
+            String openid = JwtUtil.verify(token);
+
+            // 3. 查用户
+            User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+
+            // 4. 组装流水数据
+            Map<String, Object> data = new HashMap<>();
+            data.put("points", user.getPoints());
+            data.put("credit", user.getCredit());
+            data.put("pointLedgers", pointLedgerRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
+            data.put("creditLedgers", creditLedgerRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
+
+            return Result.success(data);
+        } catch (Exception e) {
+            return Result.error(401, "Token 无效或已过期");
+        }
     }
 }

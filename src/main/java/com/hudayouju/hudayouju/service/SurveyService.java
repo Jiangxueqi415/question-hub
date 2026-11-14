@@ -8,6 +8,7 @@ import com.hudayouju.hudayouju.repository.SurveyRepository;
 import com.hudayouju.hudayouju.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -23,10 +24,14 @@ public class SurveyService {
         this.userRepo = userRepo;
     }
 
-    // 提交问卷核心逻辑
     public String submitSurvey(Long surveyId, Long userId, long timeSpentSeconds, String answersJson) {
         // 1. 查问卷
         Survey survey = surveyRepo.findById(surveyId).orElseThrow(() -> new RuntimeException("问卷不存在"));
+
+        // 截止时间拦截
+        if (LocalDateTime.now().isAfter(survey.getEndAt())) {
+            throw new RuntimeException("该问卷已截止，无法提交！");
+        }
 
         // 2. 不能填自己的问卷
         if (survey.getOwnerId().equals(userId)) {
@@ -39,28 +44,24 @@ public class SurveyService {
             throw new RuntimeException("你已经提交过这份问卷了！");
         }
 
-        // 4. 🔥 漏答率核验（PRD 6.5 规则：未答率>20% 判 incomplete）
-        // 因为前端目前没传具体答案，如果 answers 为 "[]" 或空，直接视为 100% 漏答
+        // 4. 漏答率核验
         boolean isIncomplete = (answersJson == null || answersJson.trim().equals("[]") || answersJson.trim().isEmpty());
-
         if (isIncomplete) {
             Response response = new Response();
             response.setSurveyId(surveyId);
             response.setUserId(userId);
-            response.setStatus("incomplete"); // 状态改为未答完
+            response.setStatus("incomplete");
             response.setFlagsJson("[\"incomplete\"]");
             response.setAnswersJson(answersJson);
             responseRepo.save(response);
 
-            // 按 PRD 规定：不发积分，扣 5 信誉
             User user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("用户不存在"));
             user.setCredit(user.getCredit() - 5);
             userRepo.save(user);
-
             return "提交被拦截：漏答率过高（100%），本次不发积分，并扣除 5 信誉。";
         }
 
-        // 5. 防作弊（极速核验，小于3秒判无效）
+        // 5. 防作弊（极速核验）
         String flags = "[]";
         String status = "valid";
         if (timeSpentSeconds < 3) {

@@ -2,15 +2,18 @@ package com.hudayouju.hudayouju.controller;
 
 import com.hudayouju.hudayouju.common.Result;
 import com.hudayouju.hudayouju.model.PointLedger;
+import com.hudayouju.hudayouju.model.Response;
 import com.hudayouju.hudayouju.model.Survey;
 import com.hudayouju.hudayouju.model.User;
 import com.hudayouju.hudayouju.repository.PointLedgerRepository;
+import com.hudayouju.hudayouju.repository.ResponseRepository;
 import com.hudayouju.hudayouju.repository.SurveyRepository;
 import com.hudayouju.hudayouju.repository.UserRepository;
 import com.hudayouju.hudayouju.service.SurveyService;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,25 +24,26 @@ public class SurveyController {
     private final SurveyRepository surveyRepository;
     private final UserRepository userRepository;
     private final PointLedgerRepository pointLedgerRepository;
+    private final ResponseRepository responseRepository;
     private final SurveyService surveyService;
 
     public SurveyController(SurveyRepository surveyRepository,
                             UserRepository userRepository,
                             PointLedgerRepository pointLedgerRepository,
+                            ResponseRepository responseRepository,
                             SurveyService surveyService) {
         this.surveyRepository = surveyRepository;
         this.userRepository = userRepository;
         this.pointLedgerRepository = pointLedgerRepository;
+        this.responseRepository = responseRepository;
         this.surveyService = surveyService;
     }
 
-    // 1. 获取所有问卷列表
     @GetMapping
     public Result<List<Survey>> list() {
         return Result.success(surveyRepository.findAll());
     }
 
-    // 2. 发布问卷
     @PostMapping
     public Result<Object> publish(@RequestBody Map<String, Object> body, @RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid)
@@ -73,21 +77,51 @@ public class SurveyController {
         return Result.success("发布成功");
     }
 
-    // 3. 提交问卷接口（带漏答率拦截）
     @PostMapping("/{id}/submit")
     public Result<Object> submit(@PathVariable Long id,
                                  @RequestBody Map<String, Object> body,
                                  @RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
-
         long timeSpentSeconds = Long.parseLong(body.getOrDefault("timeSpentSeconds", "10").toString());
-
-        // 接收前端传过来的 answers
         String answersJson = body.getOrDefault("answers", "[]").toString();
-
-        // 传给 Service 处理
         String resultMsg = surveyService.submitSurvey(id, user.getId(), timeSpentSeconds, answersJson);
-
         return Result.success(resultMsg);
+    }
+
+    @GetMapping("/my")
+    public Result<List<Survey>> mySurveys(@RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+        return Result.success(surveyRepository.findByOwnerId(user.getId()));
+    }
+
+    @GetMapping("/my-responses")
+    public Result<List<Response>> myResponses(@RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+        return Result.success(responseRepository.findByUserId(user.getId()));
+    }
+
+    @GetMapping("/{id}/stats")
+    public Result<Object> getStats(@PathVariable Long id, @RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+        Survey survey = surveyRepository.findById(id).orElseThrow(() -> new RuntimeException("问卷不存在"));
+
+        if (!survey.getOwnerId().equals(user.getId())) {
+            return Result.error(403, "只有发布者才能查看统计");
+        }
+
+        List<Response> responses = responseRepository.findBySurveyId(id);
+
+        long validCount = responses.stream().filter(r -> "valid".equals(r.getStatus())).count();
+        long invalidCount = responses.stream().filter(r -> "invalid".equals(r.getStatus())).count();
+        long incompleteCount = responses.stream().filter(r -> "incomplete".equals(r.getStatus())).count();
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("surveyTitle", survey.getTitle());
+        stats.put("totalCollected", responses.size());
+        stats.put("validCount", validCount);
+        stats.put("invalidCount", invalidCount);
+        stats.put("incompleteCount", incompleteCount);
+
+        return Result.success(stats);
     }
 }

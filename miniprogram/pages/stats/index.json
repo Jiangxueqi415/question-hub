@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "答题统计",
+  "usingComponents": {
+    "empty-state": "/components/empty-state/index"
+  }
+}

@@ -1,0 +1,251 @@
+<view class="page publish-page">
+  <view class="publish-top">
+    <view class="publish-top__scores">
+      <view class="publish-top__score">
+        <text class="publish-top__label">当前积分</text>
+        <text class="publish-top__value">{{me.points}}</text>
+      </view>
+      <view class="publish-top__divider"></view>
+      <view class="publish-top__score">
+        <text class="publish-top__label">信誉分</text>
+        <text class="publish-top__value">{{me.credit}}</text>
+      </view>
+    </view>
+    <view class="publish-top__hint {{canPublish ? 'publish-top__hint--ok' : 'publish-top__hint--warn'}}">
+      {{thresholdHint}}
+    </view>
+  </view>
+
+  <block wx:if="{{needBind}}">
+    <view class="card publish-guard">
+      <view class="publish-guard__title">请先绑定学号</view>
+      <view class="publish-guard__desc">
+        未绑定学号可以浏览问卷，但发布问卷需要先绑定学号，并达到信誉分 ≥40、积分 ≥10 的发布条件。
+      </view>
+      <button class="btn btn--primary btn--block" bindtap="goProfile">去“我的”绑定</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view wx:if="{{editingId}}" class="card edit-banner">
+      <view class="edit-banner__main">
+        <view class="edit-banner__title">正在编辑：{{editingTitle}}</view>
+        <view class="edit-banner__desc">
+          {{questionLocked ? '该问卷已有作答，题目已锁定；标题、简介、分类和时间仍可修改。' : '保存修改不消耗积分，题目可以继续调整。'}}
+        </view>
+      </view>
+      <text class="edit-banner__cancel" bindtap="onCancelEdit">取消编辑</text>
+    </view>
+
+    <view wx:if="{{!questionLocked}}" class="card template-card">
+      <view class="publish-section-title">问卷模板</view>
+      <view class="template-list">
+        <view
+          wx:for="{{templates}}"
+          wx:key="id"
+          class="template-item"
+          data-id="{{item.id}}"
+          bindtap="onApplyTemplate"
+        >
+          <view class="template-item__name">{{item.name}}</view>
+          <view class="template-item__title">{{item.title}}</view>
+        </view>
+      </view>
+      <view class="publish-note">点击模板自动填充标题、简介和题目，可继续修改。</view>
+    </view>
+
+    <view class="card">
+      <view class="publish-section-title">基本信息</view>
+
+      <view class="field">
+        <text class="field__label">问卷标题</text>
+        <input
+          class="field__input"
+          maxlength="40"
+          placeholder="请输入标题（2–40 字）"
+          value="{{title}}"
+          bindinput="onTitleInput"
+        />
+        <view class="field__count">{{title.length}}/40</view>
+      </view>
+
+      <view class="field">
+        <text class="field__label">问卷简介</text>
+        <textarea
+          class="publish-desc"
+          maxlength="200"
+          placeholder="简单说明问卷目的（选填，最多 200 字）"
+          value="{{description}}"
+          bindinput="onDescriptionInput"
+        />
+        <view class="field__count">{{description.length}}/200</view>
+      </view>
+
+      <view class="field field--inline">
+        <view class="field__col">
+          <text class="field__label">分类</text>
+          <picker range="{{categories}}" value="{{categoryIndex}}" bindchange="onCategoryChange">
+            <view class="picker">
+              <text>{{categories[categoryIndex]}}</text>
+              <text class="picker__arrow">›</text>
+            </view>
+          </picker>
+        </view>
+        <view class="field__col">
+          <text class="field__label">预计耗时（分钟）</text>
+          <input
+            class="field__input"
+            type="number"
+            value="{{minutes}}"
+            bindinput="onMinutesInput"
+          />
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field__label">开始时间</text>
+        <view class="time-row">
+          <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange">
+            <view class="picker">{{startDate}}</view>
+          </picker>
+          <picker mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
+            <view class="picker picker--time">{{startTime}}</view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field__label">截止时间</text>
+        <view class="time-row">
+          <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange">
+            <view class="picker">{{endDate}}</view>
+          </picker>
+          <picker mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
+            <view class="picker picker--time">{{endTime}}</view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="publish-note">
+        发布者显示为“{{me.nickname || '校园用户'}}”；只展示昵称，不采集真实姓名。
+      </view>
+    </view>
+
+    <view class="section-head">
+      <text class="section-head__title">题目</text>
+      <text class="section-head__count">{{questions.length}}/25</text>
+    </view>
+
+    <view wx:if="{{questionLocked}}" class="publish-lock-note">
+      该问卷已有作答，题目已锁定；保存时只更新标题、简介、分类和时间。
+    </view>
+
+    <view wx:for="{{questions}}" wx:key="key" class="card publish-question">
+      <view class="publish-question__head">
+        <text class="publish-question__no">第 {{index + 1}} 题</text>
+        <view class="publish-question__ops">
+          <picker
+            wx:if="{{!questionLocked}}"
+            range="{{questionTypes}}"
+            range-key="label"
+            value="{{item.typeIndex}}"
+            data-index="{{index}}"
+            bindchange="onTypeChange"
+          >
+            <view class="picker picker--sm">
+              <text>{{item.typeLabel}}</text>
+              <text class="picker__arrow">›</text>
+            </view>
+          </picker>
+          <text wx:else class="publish-question__type">{{item.typeLabel}}</text>
+          <text
+            wx:if="{{!questionLocked}}"
+            class="link-danger publish-question__remove"
+            data-index="{{index}}"
+            bindtap="onRemoveQuestion"
+          >删除</text>
+        </view>
+      </view>
+
+      <input
+        class="field__input publish-question__title"
+        maxlength="100"
+        placeholder="请输入题目（最多 100 字）"
+        value="{{item.title}}"
+        disabled="{{questionLocked}}"
+        data-index="{{index}}"
+        bindinput="onQuestionTitleInput"
+      />
+
+      <block wx:if="{{item.type !== 'open'}}">
+        <view class="options-head">
+          <text class="options-head__label">选项</text>
+          <text class="options-head__hint">2–6 个，不能重复</text>
+        </view>
+
+        <view
+          wx:for="{{item.options}}"
+          wx:for-item="option"
+          wx:for-index="oIndex"
+          wx:key="key"
+          class="option-row"
+        >
+          <text class="option-row__letter">{{optionLetters[oIndex]}}</text>
+          <input
+            class="option-row__input"
+            maxlength="50"
+            placeholder="选项内容"
+            value="{{option.text}}"
+            disabled="{{questionLocked}}"
+            data-qindex="{{index}}"
+            data-oindex="{{oIndex}}"
+            bindinput="onOptionInput"
+          />
+          <text
+            wx:if="{{!questionLocked && item.options.length > 2}}"
+            class="option-row__remove"
+            data-qindex="{{index}}"
+            data-oindex="{{oIndex}}"
+            bindtap="onRemoveOption"
+          >×</text>
+        </view>
+
+        <view
+          wx:if="{{!questionLocked && item.options.length < 6}}"
+          class="link-primary publish-question__add"
+          data-index="{{index}}"
+          bindtap="onAddOption"
+        >＋ 添加选项</view>
+      </block>
+
+      <view wx:else class="publish-open-hint">
+        开放题无需选项，作答者最多输入 100 字。
+      </view>
+    </view>
+
+    <button
+      wx:if="{{!questionLocked}}"
+      class="btn btn--ghost btn--block publish-add-question"
+      disabled="{{questions.length >= 25}}"
+      bindtap="onAddQuestion"
+    >
+      ＋ 添加题目
+    </button>
+
+    <view wx:if="{{formError}}" class="form-error">{{formError}}</view>
+
+    <view class="publish-actions">
+      <button
+        class="btn btn--block {{canPublish ? 'btn--primary' : 'btn--disabled'}}"
+        loading="{{submitting}}"
+        disabled="{{submitting || (!canPublish && !editingId)}}"
+        bindtap="onSubmit"
+      >
+        {{publishButtonText}}
+      </button>
+      <view class="publish-actions__note">
+        {{editingId ? '保存修改不消耗积分；已有作答时题目不可修改。' : '发布后题目不可修改；成功发布扣除 10 积分，信誉分不扣除。'}}
+      </view>
+    </view>
+  </block>
+</view>

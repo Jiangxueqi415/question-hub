@@ -1,0 +1,23 @@
+<view class="score-cards">
+  <view class="score-card">
+    <view class="score-card__label">我的积分</view>
+    <view class="score-card__value">
+      {{points}}<text class="score-card__unit">分</text>
+    </view>
+    <view class="score-card__hint">完成 +5 · 发布 -10</view>
+  </view>
+
+  <view class="score-card" bindtap="onCreditTap">
+    <view class="score-card__head">
+      <text class="score-card__label">我的信誉分</text>
+      <text class="level level--{{levelTone}}">{{levelName}}</text>
+    </view>
+    <view class="score-card__value">
+      {{credit}}<text class="score-card__unit">/100</text>
+    </view>
+    <view class="progress">
+      <view class="progress__bar progress__bar--{{levelTone}}" style="width: {{credit}}%;"></view>
+    </view>
+    <view class="score-card__hint">{{creditHint}}</view>
+  </view>
+</view>

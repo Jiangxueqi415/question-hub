@@ -1,0 +1,4 @@
+<view class="answer-timer">
+  <view class="answer-timer__dot"></view>
+  <text class="answer-timer__text">正在记录作答时间：{{text}}</text>
+</view>

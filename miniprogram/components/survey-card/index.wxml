@@ -1,0 +1,15 @@
+<view class="survey-card" bindtap="onTap">
+  <view class="survey-card__head">
+    <text class="survey-card__title">{{survey.title}}</text>
+    <text wx:if="{{survey.mine}}" class="tag">我发布的</text>
+  </view>
+
+  <view class="survey-card__meta">
+    发布者 {{survey.ownerName}} · 预计 {{survey.minutes}} 分钟 · {{survey.questionCount}} 题<text wx:if="{{survey.participantCount !== null}}"> · {{survey.participantCount}} 人参与</text>
+  </view>
+
+  <view class="survey-card__foot">
+    <text class="survey-card__deadline">{{deadlineText}}</text>
+    <text class="survey-card__reward">+{{survey.reward}} 积分</text>
+  </view>
+</view>

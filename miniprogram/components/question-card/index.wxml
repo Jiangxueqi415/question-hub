@@ -1,0 +1,42 @@
+<view class="question-card">
+  <view class="question-card__head">
+    <view class="question-card__heading">
+      <text class="question-card__no">第 {{index + 1}} 题</text>
+      <text class="question-card__type">{{typeLabel}}</text>
+      <text wx:if="{{!readonly && !answered}}" class="question-card__miss">未答</text>
+    </view>
+    <text wx:if="{{readonly && answered}}" class="question-card__done">已作答</text>
+  </view>
+
+  <view class="question-card__title">{{question.title}}</view>
+
+  <view wx:if="{{question.type === 'single' || question.type === 'multiple'}}" class="options">
+    <view
+      wx:for="{{optionViews}}"
+      wx:key="id"
+      class="option {{item.selected ? 'option--selected' : ''}}"
+      data-index="{{index}}"
+      bindtap="onOptionTap"
+    >
+      <view class="option__mark {{question.type === 'multiple' ? 'option__mark--multi' : ''}} {{item.selected ? 'option__mark--selected' : ''}}">
+        <text wx:if="{{item.selected}}" class="option__check">✓</text>
+      </view>
+      <text class="option__letter">{{item.letter}}</text>
+      <text class="option__text">{{item.text}}</text>
+    </view>
+  </view>
+
+  <view wx:else class="open-wrap">
+    <textarea
+      wx:if="{{!readonly}}"
+      class="open-input"
+      value="{{openText}}"
+      maxlength="100"
+      placeholder="请输入你的看法（最多 100 字）"
+      bindinput="onOpenInput"
+      auto-height
+    />
+    <view wx:else class="open-readonly">{{openText || '（未作答）'}}</view>
+    <view wx:if="{{!readonly}}" class="open-count">{{openText.length}}/100</view>
+  </view>
+</view>

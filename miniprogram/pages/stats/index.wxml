@@ -1,0 +1,86 @@
+<view class="page stats-page">
+  <view wx:if="{{loading}}" class="stats-loading">正在加载统计…</view>
+
+  <empty-state wx:elif="{{error}}" icon="📊" title="无法查看统计" desc="{{error}}">
+    <view class="empty-actions">
+      <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+    </view>
+  </empty-state>
+
+  <block wx:else>
+    <view class="stats-head">
+      <view class="stats-head__title">{{survey.title}}</view>
+      <view class="stats-head__meta">
+        {{statusText}}<text wx:if="{{participantCount !== null}}"> · {{participantCount}} 人参与</text>
+      </view>
+      <view wx:if="{{survey.description}}" class="stats-head__desc">{{survey.description}}</view>
+      <view wx:if="{{canManage}}" class="stats-head__actions">
+        <button class="btn btn--primary btn--sm" bindtap="onEdit">编辑问卷</button>
+        <button wx:if="{{!closed}}" class="btn btn--ghost btn--sm" bindtap="onClose">下架问卷</button>
+        <text wx:else class="tag tag--gray">已下架</text>
+      </view>
+      <view wx:else class="stats-head__meta">后端暂未提供编辑 / 下架接口</view>
+    </view>
+
+    <view wx:if="{{!questions.length}}" class="card stats-question">
+      <view class="stats-empty">后端暂未返回题目统计数据</view>
+    </view>
+
+    <view class="stats-tabs">
+      <view
+        class="stats-tab {{mode === 'bar' ? 'stats-tab--active' : ''}}"
+        data-mode="bar"
+        bindtap="onSwitchMode"
+      >条形图</view>
+      <view
+        class="stats-tab {{mode === 'pie' ? 'stats-tab--active' : ''}}"
+        data-mode="pie"
+        bindtap="onSwitchMode"
+      >扇形图</view>
+    </view>
+
+    <view wx:for="{{questions}}" wx:key="id" class="card stats-question">
+      <view class="stats-question__head">
+        <view class="stats-question__title">第 {{index + 1}} 题 · {{item.title}}</view>
+        <text class="stats-question__type">{{item.typeText}}</text>
+      </view>
+
+      <view wx:if="{{item.type === 'open'}}" class="stats-open">
+        <view class="stats-open__meta">共 {{item.total}} 条回答</view>
+        <view wx:for="{{item.answers}}" wx:for-item="answer" wx:key="key" class="stats-open__item">
+          {{answer.text}}
+        </view>
+        <view wx:if="{{!item.answers.length}}" class="stats-empty">暂无文字回答</view>
+      </view>
+
+      <block wx:else>
+        <view wx:if="{{mode === 'bar'}}" class="bars">
+          <view wx:for="{{item.options}}" wx:for-item="option" wx:key="text" class="bar-row">
+            <view class="bar-row__head">
+              <text class="bar-row__label">{{option.text}}</text>
+              <text class="bar-row__value">{{option.count}} 人 · {{option.percent}}%</text>
+            </view>
+            <view class="bar-track">
+              <view class="bar-fill" style="width: {{option.percent}}%; background: {{option.barColor}};"></view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:else class="pie-wrap">
+          <view class="pie" style="{{item.pieStyle}}"></view>
+          <view class="pie-legend">
+            <view wx:for="{{item.options}}" wx:for-item="option" wx:key="text" class="pie-legend__row">
+              <text class="pie-legend__dot" style="background: {{option.color}};"></text>
+              <text class="pie-legend__text">{{option.text}}</text>
+              <text class="pie-legend__value">{{option.count}} · {{option.piePercent}}%</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{item.type === 'multiple'}}" class="stats-question__foot">
+          多选题可多选，条形图占比按作答人数计算，扇形图按选择次数占比。
+        </view>
+      </block>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,249 @@
+.profile-page {
+  padding-top: 20rpx;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+  padding: 30rpx;
+  border-radius: 26rpx;
+  background: linear-gradient(135deg, #2f6fed, #5b8cf7);
+  box-shadow: 0 14rpx 34rpx rgba(47, 111, 237, 0.22);
+}
+
+.profile-head__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2rpx solid rgba(255, 255, 255, 0.4);
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.profile-head__main {
+  flex: 1;
+  min-width: 0;
+  margin-left: 22rpx;
+}
+
+.profile-head__name-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.profile-head__name {
+  max-width: 360rpx;
+  overflow: hidden;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.profile-head__edit {
+  margin-left: 16rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.profile-head__sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nickname-editor {
+  display: flex;
+  align-items: center;
+}
+
+.nickname-editor__input {
+  flex: 1;
+  height: 60rpx;
+  padding: 0 16rpx;
+  border-radius: 10rpx;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 26rpx;
+  color: #1f2937;
+}
+
+.nickname-editor__save {
+  margin-left: 14rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.nickname-editor__cancel {
+  margin-left: 16rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.ledger-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ledger-tabs {
+  display: flex;
+  border-bottom: 1rpx solid #f1f4f9;
+}
+
+.ledger-tab {
+  flex: 1;
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  color: #8a94a6;
+  border-bottom: 4rpx solid transparent;
+}
+
+.ledger-tab--active {
+  color: #2f6fed;
+  font-weight: 600;
+  border-bottom-color: #2f6fed;
+}
+
+.ledger-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22rpx 28rpx;
+  border-bottom: 1rpx solid #f5f7fb;
+}
+
+.ledger-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-row__main {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16rpx;
+}
+
+.ledger-row__reason {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.ledger-row__time {
+  margin-top: 4rpx;
+  font-size: 21rpx;
+  color: #9ca3af;
+}
+
+.ledger-row__right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.ledger-row__delta {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.ledger-row__delta--up {
+  color: #16a34a;
+}
+
+.ledger-row__delta--down {
+  color: #dc2626;
+}
+
+.ledger-row__balance {
+  margin-top: 4rpx;
+  font-size: 21rpx;
+  color: #9ca3af;
+}
+
+.ledger-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.list-card {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(31, 58, 110, 0.05);
+}
+
+.list-card__main {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16rpx;
+}
+
+.list-card__title {
+  overflow: hidden;
+  font-size: 27rpx;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.list-card__meta {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #8a94a6;
+}
+
+.privacy-note {
+  margin: 28rpx 8rpx 0;
+  font-size: 21rpx;
+  line-height: 1.65;
+  color: #9ca3af;
+}
+
+.bind-card {
+  margin-bottom: 20rpx;
+}
+
+.bind-card__title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.bind-card__desc {
+  margin: 10rpx 0 30rpx;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #8a94a6;
+}
+
+.bind-submit {
+  margin-top: 28rpx;
+}
+
+.bind-note {
+  margin-top: 18rpx;
+  text-align: center;
+  font-size: 21rpx;
+  line-height: 1.6;
+  color: #9ca3af;
+}
+
+.section-note {
+  margin: -6rpx 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #9ca3af;
+}

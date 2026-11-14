@@ -1,0 +1,88 @@
+<view class="page detail-page">
+  <view wx:if="{{loading}}" class="detail-loading">正在加载问卷…</view>
+
+  <empty-state wx:elif="{{notFound}}" icon="🔍" title="问卷不存在" desc="该问卷可能已被删除或链接有误">
+    <view class="empty-actions">
+      <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+    </view>
+  </empty-state>
+
+  <empty-state wx:elif="{{loadError}}" icon="⚠️" title="加载失败" desc="{{loadError}}">
+    <view class="empty-actions">
+      <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+    </view>
+  </empty-state>
+
+  <block wx:else>
+    <view wx:if="{{startedAt && !readonly}}" class="detail-timer-sticky">
+      <answer-timer started-at="{{startedAt}}" bind:tick="onTimerTick" />
+    </view>
+
+    <view class="detail-head">
+      <view class="detail-head__title">{{survey.title}}</view>
+      <view class="detail-head__meta">
+        发布者 {{survey.ownerName}} · 预计 {{survey.minutes}} 分钟 · {{survey.questions.length}} 题
+      </view>
+      <view class="detail-head__window">{{survey.startText}} 至 {{survey.endText}}</view>
+      <view class="detail-head__stats">
+        {{survey.participantCount !== null ? survey.participantCount + ' 人已参与' : '参与人数以后端统计为准'}} · 发布于 {{survey.createdText}}
+      </view>
+      <view wx:if="{{survey.description}}" class="detail-head__desc">{{survey.description}}</view>
+      <view class="detail-head__reward">完成奖励：+5 积分 / +5 信誉分</view>
+
+      <view wx:if="{{banner}}" class="detail-banner detail-banner--{{bannerTone}}">{{banner}}</view>
+
+      <view wx:if="{{overExpected}}" class="detail-over">
+        已超过预计作答时间（{{survey.minutes}} 分钟），可以继续完成并提交。
+      </view>
+    </view>
+
+    <view class="detail-tip">请注意在截止日期内完成作答，否则视为无效。请按实际情况作答；全选同一项或开放题过于简短可能无法通过质量核验。</view>
+
+    <view wx:if="{{!questions.length}}" class="detail-tip">该问卷暂未配置题目，当前无法作答。</view>
+
+    <question-card
+      wx:for="{{questions}}"
+      wx:key="id"
+      question="{{item}}"
+      index="{{index}}"
+      value="{{item.value}}"
+      readonly="{{readonly}}"
+      bind:change="onAnswerChange"
+    />
+
+    <view wx:if="{{!readonly}}" class="detail-submit">
+      <view wx:if="{{submitHint}}" class="detail-submit__hint">{{submitHint}}</view>
+      <button
+        class="btn btn--block {{submitGreen && !submitDisabled ? 'btn--primary' : 'btn--disabled'}}"
+        loading="{{submitting}}"
+        disabled="{{submitting || submitDisabled}}"
+        bindtap="onSubmit"
+      >
+        {{submitText}}
+      </button>
+    </view>
+
+    <view wx:else class="detail-result detail-result--{{bannerTone}}">
+      <view class="detail-result__title">{{resultTitle}}</view>
+      <view wx:if="{{resultDesc}}" class="detail-result__desc">{{resultDesc}}</view>
+      <button class="btn btn--block btn--disabled detail-result__button" disabled>{{submitText}}</button>
+      <view class="detail-result__actions">
+        <block wx:if="{{needBind}}">
+          <button class="btn btn--primary btn--sm" bindtap="goProfile">去“我的”绑定</button>
+          <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+        </block>
+        <block wx:elif="{{own}}">
+          <button class="btn btn--primary btn--sm" bindtap="onViewStats">查看统计</button>
+          <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+        </block>
+        <block wx:elif="{{showRecordAction}}">
+          <button class="btn btn--ghost btn--sm" bindtap="goProfile">查看我的记录</button>
+        </block>
+        <block wx:else>
+          <button class="btn btn--ghost btn--sm" bindtap="goHome">返回首页</button>
+        </block>
+      </view>
+    </view>
+  </block>
+</view>

@@ -1,7 +1,8 @@
 const api = require('../../services/api');
 const constants = require('../../utils/constants');
 
-const COLORS = ['#2f6fed', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#b9d4f6', '#c8e6c9', '#ffe0b2', '#f8bbd0', '#d1c4e9', '#b2ebf2'];
+const BAR_COLOR = '#b9d4f6';
 
 function buildPieStyle(counts) {
   const total = (counts || []).reduce(function (sum, count) {
@@ -86,6 +87,7 @@ Page({
                 count: option.count,
                 percent: option.percent,
                 color: COLORS[index % COLORS.length],
+                barColor: BAR_COLOR,
                 piePercent: selectionTotal
                   ? Math.round((option.count / selectionTotal) * 1000) / 10
                   : 0

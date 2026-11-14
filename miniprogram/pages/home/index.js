@@ -140,8 +140,12 @@ Page({
         const app = getApp();
         app.updateUser(res.user);
         this.setData({ me: res.user });
+        let toastTitle = '新人任务已领取';
+        if (!res.already) {
+          toastTitle = res.creditDelta > 0 ? '信誉分 +' + res.creditDelta : '信誉分已满，未再增加';
+        }
         wx.showToast({
-          title: res.already ? '新人任务已领取' : '信誉分 +' + res.creditDelta,
+          title: toastTitle,
           icon: 'none'
         });
       })

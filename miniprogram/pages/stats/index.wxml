@@ -56,7 +56,7 @@
               <text class="bar-row__value">{{option.count}} 人 · {{option.percent}}%</text>
             </view>
             <view class="bar-track">
-              <view class="bar-fill" style="width: {{option.percent}}%; background: {{option.color}};"></view>
+              <view class="bar-fill" style="width: {{option.percent}}%; background: {{option.barColor}};"></view>
             </view>
           </view>
         </view>

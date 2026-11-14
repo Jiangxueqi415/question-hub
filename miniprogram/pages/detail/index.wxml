@@ -14,6 +14,10 @@
   </empty-state>
 
   <block wx:else>
+    <view wx:if="{{startedAt && !readonly}}" class="detail-timer-sticky">
+      <answer-timer started-at="{{startedAt}}" bind:tick="onTimerTick" />
+    </view>
+
     <view class="detail-head">
       <view class="detail-head__title">{{survey.title}}</view>
       <view class="detail-head__meta">
@@ -28,11 +32,6 @@
 
       <view wx:if="{{banner}}" class="detail-banner detail-banner--{{bannerTone}}">{{banner}}</view>
 
-      <answer-timer
-        wx:if="{{startedAt && !readonly}}"
-        started-at="{{startedAt}}"
-        bind:tick="onTimerTick"
-      />
       <view wx:if="{{overExpected}}" class="detail-over">
         已超过预计作答时间（{{survey.minutes}} 分钟），可以继续完成并提交。
       </view>

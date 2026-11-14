@@ -782,13 +782,24 @@ function flagLabels(flags) {
   });
 }
 
-function statusMessage(status, flags, missedCount) {
+function statusMessage(status, flags, missedCount, pointsDelta, creditDelta) {
   const labels = flagLabels(flags);
   if (status === 'valid') {
-    if (labels.length) {
-      return '提交成功：+5 积分、+5 信誉分（本次有 1 项异常标记：' + labels.join('、') + '，已记录）';
+    const rewardParts = ['+' + pointsDelta + ' 积分'];
+    if (creditDelta > 0) {
+      rewardParts.push(
+        '+' + creditDelta + ' 信誉分' +
+          (creditDelta < constants.REWARD_CREDIT ? '（已达上限 100）' : '')
+      );
+    } else {
+      rewardParts.push('信誉分已满（100 分），本次不再增加');
     }
-    return '提交成功：+5 积分、+5 信誉分';
+
+    let message = '提交成功：' + rewardParts.join('、');
+    if (labels.length) {
+      message += '（本次有 1 项异常标记：' + labels.join('、') + '，已记录）';
+    }
+    return message;
   }
   if (status === 'invalid') {
     if (flags.indexOf('fast') !== -1) {
@@ -797,10 +808,12 @@ function statusMessage(status, flags, missedCount) {
     return '未通过质量核验：' + labels.join('、') + '。本次不计积分和信誉分。';
   }
   if (status === 'incomplete') {
-    return '未答完：还有 ' + missedCount + ' 题未答。本次不计积分，信誉 -5。';
+    const creditText = creditDelta < 0 ? '信誉 ' + creditDelta : '信誉分已为 0，未再扣减';
+    return '未答完：还有 ' + missedCount + ' 题未答。本次不计积分，' + creditText + '。';
   }
   if (status === 'expired') {
-    return '问卷已截止，本次作答无效。';
+    const creditText = creditDelta < 0 ? '信誉 ' + creditDelta : '信誉分已为 0，未再扣减';
+    return '问卷已截止，本次作答无效，' + creditText + '。';
   }
   return '';
 }
@@ -817,6 +830,15 @@ function buildSubmitResult(state, response, survey, missedCount) {
   } else if (response.status === 'expired') {
     creditDelta = -constants.EXPIRED_CREDIT_PENALTY;
   }
+
+  // 新记录保存的是实际变动值；旧记录没有字段时回退到名义值
+  if (typeof response.pointsDelta === 'number') {
+    pointsDelta = response.pointsDelta;
+  }
+  if (typeof response.creditDelta === 'number') {
+    creditDelta = response.creditDelta;
+  }
+
   const missed =
     typeof missedCount === 'number'
       ? missedCount
@@ -832,7 +854,7 @@ function buildSubmitResult(state, response, survey, missedCount) {
     points: state.user.points,
     credit: state.user.credit,
     missedCount: missed,
-    message: statusMessage(response.status, flags, missed)
+    message: statusMessage(response.status, flags, missed, pointsDelta, creditDelta)
   };
 }
 
@@ -862,10 +884,18 @@ function settleAttemptExpired(state, attempt, survey) {
   };
   state.responses.push(response);
 
+  let creditDelta = 0;
   if (attempt.userId === state.user.id) {
     const title = survey ? survey.title : '问卷';
-    addCredit(state, -constants.EXPIRED_CREDIT_PENALTY, '逾期未作答：《' + title + '》', attempt.surveyId);
+    creditDelta = addCredit(
+      state,
+      -constants.EXPIRED_CREDIT_PENALTY,
+      '逾期未作答：《' + title + '》',
+      attempt.surveyId
+    );
   }
+  response.pointsDelta = 0;
+  response.creditDelta = creditDelta;
 }
 
 /**
@@ -928,6 +958,8 @@ function submitSurvey(state, surveyId, data) {
     answers: normalized.answers,
     flags: quality.flags,
     status: quality.status,
+    pointsDelta: 0,
+    creditDelta: 0,
     createdAt: now,
     submittedAt: now
   };
@@ -936,17 +968,26 @@ function submitSurvey(state, surveyId, data) {
   attempt.status = quality.status;
   attempt.submittedAt = now;
 
+  let pointsDelta = 0;
+  let creditDelta = 0;
   if (quality.status === 'valid') {
-    addPoints(state, constants.REWARD_POINTS, '有效完成问卷：《' + survey.title + '》', survey.id);
-    addCredit(state, constants.REWARD_CREDIT, '有效完成问卷：《' + survey.title + '》', survey.id);
+    pointsDelta = addPoints(state, constants.REWARD_POINTS, '有效完成问卷：《' + survey.title + '》', survey.id);
+    creditDelta = addCredit(
+      state,
+      constants.REWARD_CREDIT,
+      '有效完成问卷：《' + survey.title + '》',
+      survey.id
+    );
   } else if (quality.status === 'incomplete') {
-    addCredit(
+    creditDelta = addCredit(
       state,
       -constants.INCOMPLETE_CREDIT_PENALTY,
       '未答完：《' + survey.title + '》',
       survey.id
     );
   }
+  response.pointsDelta = pointsDelta;
+  response.creditDelta = creditDelta;
 
   const result = buildSubmitResult(state, response, survey, quality.missedCount);
   if (requestId) state.requests[requestId] = result;
@@ -967,6 +1008,12 @@ function toPublicResponse(state, response) {
     creditDelta = -constants.INCOMPLETE_CREDIT_PENALTY;
   } else if (status === 'expired') {
     creditDelta = -constants.EXPIRED_CREDIT_PENALTY;
+  }
+  if (typeof response.pointsDelta === 'number') {
+    pointsEarned = response.pointsDelta;
+  }
+  if (typeof response.creditDelta === 'number') {
+    creditDelta = response.creditDelta;
   }
 
   return {

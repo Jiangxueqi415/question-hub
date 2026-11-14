@@ -7,6 +7,17 @@
   color: #9ca3af;
 }
 
+.detail-timer-sticky {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-bottom: 16rpx;
+  padding: 8rpx 0;
+  background: #f5f7fb;
+  box-shadow: 0 8rpx 18rpx rgba(31, 58, 110, 0.04);
+}
+
 .detail-head {
   margin-bottom: 20rpx;
   padding: 30rpx;

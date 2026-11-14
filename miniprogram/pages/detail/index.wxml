@@ -25,7 +25,7 @@
       </view>
       <view class="detail-head__window">{{survey.startText}} 至 {{survey.endText}}</view>
       <view class="detail-head__stats">
-        {{survey.participantCount}} 人已参与 · 发布于 {{survey.createdText}}
+        {{survey.participantCount !== null ? survey.participantCount + ' 人已参与' : '参与人数以后端统计为准'}} · 发布于 {{survey.createdText}}
       </view>
       <view wx:if="{{survey.description}}" class="detail-head__desc">{{survey.description}}</view>
       <view class="detail-head__reward">完成奖励：+5 积分 / +5 信誉分</view>
@@ -38,6 +38,8 @@
     </view>
 
     <view class="detail-tip">请注意在截止日期内完成作答，否则视为无效。请按实际情况作答；全选同一项或开放题过于简短可能无法通过质量核验。</view>
+
+    <view wx:if="{{!questions.length}}" class="detail-tip">该问卷暂未配置题目，当前无法作答。</view>
 
     <question-card
       wx:for="{{questions}}"

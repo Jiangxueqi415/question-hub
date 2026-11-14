@@ -1,6 +1,5 @@
 const config = require('../config/index');
 const auth = require('./auth');
-const mockServer = require('./mock-server');
 const constants = require('./constants');
 
 function makeError(code, message) {
@@ -28,8 +27,7 @@ function handleUnauthorized() {
 }
 
 /**
- * 统一请求入口。
- * Mock 模式下不会发起网络请求；真机联调时把 config/index.js 的 useMock 改为 false。
+ * 统一请求入口：拼接 baseUrl、注入 Bearer token、解包统一响应。
  *
  * 服务端响应约定（PRD 第 9 节）：{ code, message, data }
  * code === 0 视为成功，其余按业务错误处理。
@@ -39,15 +37,6 @@ function request(options) {
   const method = (opts.method || 'GET').toUpperCase();
   const url = opts.url || '';
   const data = opts.data || {};
-
-  if (config.useMock) {
-    return mockServer.request({ url: url, method: method, data: data }).catch(function (err) {
-      if (err && err.code === 'AUTH_REQUIRED') {
-        handleUnauthorized();
-      }
-      throw err;
-    });
-  }
 
   return new Promise(function (resolve, reject) {
     const header = { 'content-type': 'application/json' };

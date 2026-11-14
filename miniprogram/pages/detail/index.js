@@ -94,7 +94,7 @@ Page({
           startText: format.formatDateTime(survey.startAt),
           endText: format.formatDateTime(survey.endAt),
           createdText: format.formatDateTime(survey.createdAt),
-          participantCount: survey.participantCount || 0
+          participantCount: survey.participantCount != null ? survey.participantCount : null
         });
 
         this.setData({
@@ -222,7 +222,7 @@ Page({
       submitGreen: false,
       submitHint: '',
       resultTitle: '发布者视角',
-      resultDesc: '可以查看每一题的答题统计，也可以编辑或下架这份问卷。',
+      resultDesc: '可以查看每一题的答题统计。',
       showRecordAction: false
     });
   },
@@ -405,6 +405,14 @@ Page({
       .then((result) => {
         this.setData({ submitting: false });
         this.showSubmitResult(result);
+        // 后端在提交时结算积分/信誉，重新拉取用户快照刷新首页与“我的”
+        api.getMe().then((me) => {
+          if (me && me.bound !== false) {
+            getApp().updateUser(me);
+          }
+        }).catch(function () {
+          // 用户快照刷新失败不影响提交结果展示
+        });
       })
       .catch((err) => {
         this.setData({ submitting: false });
@@ -437,6 +445,39 @@ Page({
   showSubmitResult(result) {
     const status = result.status;
     const flags = result.flags || [];
+    const message = result.message || '';
+
+    // 真实后端提交接口只返回结果文案，没有 valid/invalid 等结构化状态
+    if (status === 'submitted') {
+      this.setData({
+        readonly: true,
+        needBind: false,
+        startedAt: 0,
+        confirming: false,
+        overExpected: false,
+        showRecordAction: true,
+        status: status,
+        banner: message,
+        bannerTone: 'success',
+        submitDisabled: true,
+        submitGreen: false,
+        submitHint: '',
+        submitText: '已提交',
+        resultTitle: '提交结果',
+        resultDesc: message
+      });
+      wx.showModal({
+        title: '提交结果',
+        content: message,
+        showCancel: false,
+        confirmText: '返回首页',
+        success: function () {
+          wx.switchTab({ url: '/pages/home/index' });
+        }
+      });
+      return;
+    }
+
     const tone = status === 'valid' ? 'success' : status === 'invalid' ? 'danger' : 'warn';
     const titleMap = {
       valid: '已完成填写',
@@ -444,7 +485,6 @@ Page({
       incomplete: '本次作答未答完',
       expired: '已过期'
     };
-    const message = result.message || '';
 
     if (flags.indexOf('fast') !== -1) {
       try {

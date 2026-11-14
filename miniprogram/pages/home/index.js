@@ -15,8 +15,9 @@ Page({
     ownSurveys: [],
     completedCount: 0,
     expiredCount: 0,
-    summaryText: '已完成 0 份 · 去个人中心查看',
-    emptyHint: '去发布自己的问卷，邀请同学来填写'
+    summaryText: '填写记录以后端数据为准 · 去个人中心查看',
+    emptyHint: '去发布自己的问卷，邀请同学来填写',
+    canOnboard: !!api.capabilities.onboard
   },
 
   onShow() {
@@ -83,6 +84,11 @@ Page({
           summaryText += '，' + expiredCount + ' 份已过期';
         }
         summaryText += ' · 去个人中心查看';
+
+        // 后端未提供作答记录接口时，完成数无法核验，汇总只展示口径说明
+        if (!api.capabilities.responses) {
+          summaryText = '填写记录以后端数据为准 · 去个人中心查看';
+        }
 
         const app = getApp();
         app.updateUser(me);

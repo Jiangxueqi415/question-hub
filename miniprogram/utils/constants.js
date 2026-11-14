@@ -8,6 +8,7 @@ module.exports = {
   // ---------- 积分 / 信誉 ----------
   INITIAL_POINTS: 0,
   INITIAL_CREDIT: 0,
+  POINTS_MIN: 0,
   CREDIT_MIN: 0,
   CREDIT_MAX: 100,
 

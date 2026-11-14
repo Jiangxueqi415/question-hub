@@ -11,14 +11,19 @@
     <view class="stats-head">
       <view class="stats-head__title">{{survey.title}}</view>
       <view class="stats-head__meta">
-        {{statusText}} · {{participantCount}} 人参与
+        {{statusText}}<text wx:if="{{participantCount !== null}}"> · {{participantCount}} 人参与</text>
       </view>
       <view wx:if="{{survey.description}}" class="stats-head__desc">{{survey.description}}</view>
-      <view class="stats-head__actions">
+      <view wx:if="{{canManage}}" class="stats-head__actions">
         <button class="btn btn--primary btn--sm" bindtap="onEdit">编辑问卷</button>
         <button wx:if="{{!closed}}" class="btn btn--ghost btn--sm" bindtap="onClose">下架问卷</button>
         <text wx:else class="tag tag--gray">已下架</text>
       </view>
+      <view wx:else class="stats-head__meta">后端暂未提供编辑 / 下架接口</view>
+    </view>
+
+    <view wx:if="{{!questions.length}}" class="card stats-question">
+      <view class="stats-empty">后端暂未返回题目统计数据</view>
     </view>
 
     <view class="stats-tabs">

@@ -212,20 +212,6 @@
   color: #9ca3af;
 }
 
-.dev-zone {
-  margin-top: 32rpx;
-  padding-top: 28rpx;
-  border-top: 1rpx dashed #dde3ee;
-  text-align: center;
-}
-
-.dev-zone__hint {
-  margin-top: 12rpx;
-  font-size: 20rpx;
-  line-height: 1.5;
-  color: #b0b7c3;
-}
-
 .bind-card {
   margin-bottom: 20rpx;
 }

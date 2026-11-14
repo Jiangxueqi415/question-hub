@@ -13,44 +13,93 @@
   <view wx:if="{{checking}}" class="login-loading">正在恢复登录状态…</view>
 
   <view wx:else class="login-card">
-    <view class="login-feature">
-      <text class="login-feature__icon">🎯</text>
-      <view class="login-feature__body">
-        <view class="login-feature__title">校内问卷互助</view>
-        <view class="login-feature__desc">完成他人问卷赚积分，攒够 10 分即可发布自己的问卷</view>
-      </view>
-    </view>
-    <view class="login-feature">
-      <text class="login-feature__icon">⏱</text>
-      <view class="login-feature__body">
-        <view class="login-feature__title">服务端计时与判重</view>
-        <view class="login-feature__desc">重复领取、发布者自填与异常作答都会被拦截</view>
-      </view>
-    </view>
-    <view class="login-feature">
-      <text class="login-feature__icon">📒</text>
-      <view class="login-feature__body">
-        <view class="login-feature__title">积分 / 信誉双账本</view>
-        <view class="login-feature__desc">每次加分、扣分都有时间、原因与余额，可追溯</view>
-      </view>
-    </view>
+    <block wx:if="{{needBind}}">
+      <view class="login-bind">
+        <view class="login-bind__title">首次登录，请绑定学号</view>
+        <view class="login-bind__desc">
+          真实后端要求绑定后才会签发登录凭证；绑定后即可作答、领取积分和发布问卷。
+        </view>
 
-    <button
-      class="btn btn--primary btn--block login-submit"
-      loading="{{loading}}"
-      disabled="{{loading}}"
-      bindtap="onLogin"
-    >
-      {{mockMode ? 'Mock 微信登录' : '微信一键登录'}}
-    </button>
+        <view class="login-field">
+          <text class="login-field__label">学号</text>
+          <input
+            class="login-field__input"
+            type="number"
+            maxlength="12"
+            placeholder="请输入 10–12 位数字"
+            value="{{bindStudentNo}}"
+            bindinput="onBindStudentInput"
+          />
+        </view>
 
-    <view wx:if="{{error}}" class="login-error">{{error}}</view>
+        <view class="login-field">
+          <text class="login-field__label">昵称</text>
+          <input
+            class="login-field__input"
+            maxlength="20"
+            placeholder="2–20 字，支持中文、英文和数字"
+            value="{{bindNickname}}"
+            bindinput="onBindNicknameInput"
+          />
+        </view>
 
-    <view class="login-note">
-      登录后可在“我的”绑定学号；绑定后才能作答、发布与领取积分。
-    </view>
-    <view class="login-note">
-      MVP 演示使用本地 Mock：不采集真实姓名、手机号与 IP；学号仅保存加盐哈希。
-    </view>
+        <view wx:if="{{bindError}}" class="login-error">{{bindError}}</view>
+
+        <button
+          class="btn btn--primary btn--block login-submit"
+          loading="{{bindLoading}}"
+          disabled="{{bindLoading}}"
+          bindtap="onBindSubmit"
+        >
+          绑定并进入
+        </button>
+
+        <view class="login-note">
+          一个微信只能绑定一个学号；学号由服务端加盐哈希保存，不采集真实姓名、手机号与 IP。
+        </view>
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="login-feature">
+        <text class="login-feature__icon">🎯</text>
+        <view class="login-feature__body">
+          <view class="login-feature__title">校内问卷互助</view>
+          <view class="login-feature__desc">完成他人问卷赚积分，攒够 10 分即可发布自己的问卷</view>
+        </view>
+      </view>
+      <view class="login-feature">
+        <text class="login-feature__icon">⏱</text>
+        <view class="login-feature__body">
+          <view class="login-feature__title">提交与质量核验</view>
+          <view class="login-feature__desc">提交结果与异常作答由后端核验并返回</view>
+        </view>
+      </view>
+      <view class="login-feature">
+        <text class="login-feature__icon">📒</text>
+        <view class="login-feature__body">
+          <view class="login-feature__title">积分与信誉</view>
+          <view class="login-feature__desc">积分、信誉分与等级均以后端结算结果为准</view>
+        </view>
+      </view>
+
+      <button
+        class="btn btn--primary btn--block login-submit"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="onLogin"
+      >
+        微信一键登录
+      </button>
+
+      <view wx:if="{{error}}" class="login-error">{{error}}</view>
+
+      <view class="login-note">
+        登录后需绑定学号；绑定后才能作答、发布与领取积分。
+      </view>
+      <view class="login-note">
+        登录凭证仅用于身份校验；学号由服务端加盐哈希保存，不采集真实姓名、手机号与 IP。
+      </view>
+    </block>
   </view>
 </view>

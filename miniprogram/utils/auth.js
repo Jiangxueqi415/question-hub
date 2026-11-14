@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'qh_token';
 const USER_KEY = 'qh_user';
+const OPENID_KEY = 'qh_openid';
 
 function getToken() {
   try {
@@ -14,6 +15,22 @@ function saveToken(token) {
     wx.setStorageSync(TOKEN_KEY, token || '');
   } catch (err) {
     // 存储失败时不阻断流程，接口仍会以服务端校验为准
+  }
+}
+
+function getOpenid() {
+  try {
+    return wx.getStorageSync(OPENID_KEY) || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function saveOpenid(openid) {
+  try {
+    wx.setStorageSync(OPENID_KEY, openid || '');
+  } catch (err) {
+    // 忽略：下次登录会重新获取
   }
 }
 
@@ -39,6 +56,7 @@ function clear() {
   try {
     wx.removeStorageSync(TOKEN_KEY);
     wx.removeStorageSync(USER_KEY);
+    wx.removeStorageSync(OPENID_KEY);
   } catch (err) {
     // 忽略
   }
@@ -47,6 +65,8 @@ function clear() {
 module.exports = {
   getToken: getToken,
   saveToken: saveToken,
+  getOpenid: getOpenid,
+  saveOpenid: saveOpenid,
   getCachedUser: getCachedUser,
   saveUser: saveUser,
   clear: clear

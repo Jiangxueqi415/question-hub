@@ -2,7 +2,7 @@ const api = require('../../services/api');
 const constants = require('../../utils/constants');
 const format = require('../../utils/format');
 const validation = require('../../utils/validation');
-const mockData = require('../../mock/mock.js');
+const templates = require('../../data/templates.js');
 
 let optionSeed = 0;
 
@@ -70,7 +70,7 @@ Page({
     questions: [],
     questionTypes: constants.QUESTION_TYPES,
     optionLetters: ['A', 'B', 'C', 'D', 'E', 'F'],
-    templates: mockData.TEMPLATES.map(function (template) {
+    templates: templates.TEMPLATES.map(function (template) {
       return {
         id: template.id,
         name: template.name,
@@ -235,9 +235,9 @@ Page({
     }
     const id = e.currentTarget.dataset.id;
     let template = null;
-    for (let i = 0; i < mockData.TEMPLATES.length; i += 1) {
-      if (mockData.TEMPLATES[i].id === id) {
-        template = mockData.TEMPLATES[i];
+    for (let i = 0; i < templates.TEMPLATES.length; i += 1) {
+      if (templates.TEMPLATES[i].id === id) {
+        template = templates.TEMPLATES[i];
         break;
       }
     }
@@ -491,14 +491,14 @@ Page({
       .then((res) => {
         const app = getApp();
         const me = Object.assign({}, this.data.me, {
-          points: res.points,
-          credit: res.credit
+          points: res && res.points != null ? res.points : this.data.me.points,
+          credit: res && res.credit != null ? res.credit : this.data.me.credit
         });
         app.updateUser(me);
         this.setData({ submitting: false, me: me });
         this.resetForm();
         this.refreshThreshold(me);
-        wx.showToast({ title: '发布成功，已扣除 10 积分', icon: 'none' });
+        wx.showToast({ title: '发布成功', icon: 'none' });
         setTimeout(function () {
           wx.switchTab({ url: '/pages/home/index' });
         }, 500);

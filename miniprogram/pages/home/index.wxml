@@ -20,7 +20,7 @@
     <text class="bind-tip__action">去绑定 ›</text>
   </view>
 
-  <view wx:elif="{{!me.onboarded}}" class="onboard-card" bindtap="onOnboard">
+  <view wx:elif="{{!me.onboarded && canOnboard}}" class="onboard-card" bindtap="onOnboard">
     <text class="onboard-card__icon">🎁</text>
     <view class="onboard-card__body">
       <view class="onboard-card__title">新人任务：阅读互助规则</view>
@@ -29,11 +29,11 @@
     <view class="onboard-card__action">领取</view>
   </view>
 
-  <view wx:else class="onboard-card onboard-card--done" bindtap="onViewLedger">
+  <view wx:elif="{{me.onboarded}}" class="onboard-card onboard-card--done" bindtap="onViewLedger">
     <text class="onboard-card__icon">✅</text>
     <view class="onboard-card__body">
       <view class="onboard-card__title">新人任务已完成</view>
-      <view class="onboard-card__desc">信誉分 +40，已写入信誉流水</view>
+      <view class="onboard-card__desc">信誉分已由后端记录</view>
     </view>
     <view class="onboard-card__action">查看记录</view>
   </view>
@@ -76,7 +76,9 @@
     >
       <view class="own-card__main">
         <view class="own-card__title">{{item.title}}</view>
-        <view class="own-card__meta">{{item.statusText}} · 参与 {{item.participantCount}} 人 · {{item.questionCount}} 题</view>
+        <view class="own-card__meta">
+          {{item.statusText}} · {{item.questionCount}} 题<text wx:if="{{item.participantCount !== null}}"> · 参与 {{item.participantCount}} 人</text>
+        </view>
       </view>
       <text class="own-card__action">查看统计 ›</text>
     </view>

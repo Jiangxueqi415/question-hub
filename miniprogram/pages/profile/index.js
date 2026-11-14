@@ -1,8 +1,6 @@
 const api = require('../../services/api');
-const config = require('../../config/index');
 const format = require('../../utils/format');
 const validation = require('../../utils/validation');
-const mockServer = require('../../utils/mock-server');
 
 function formatLogs(list) {
   return (list || []).map(function (entry) {
@@ -17,8 +15,10 @@ function formatLogs(list) {
 function formatSurveys(list) {
   return (list || []).map(function (survey) {
     return Object.assign({}, survey, {
-      deadlineText: format.formatShort(survey.endAt) + ' 截止',
-      participantText: '参与 ' + (survey.participantCount || 0) + ' 人',
+      deadlineText: survey.endAt ? format.formatShort(survey.endAt) + ' 截止' : '截止时间以后端为准',
+      participantText: survey.participantCount != null
+        ? '参与 ' + survey.participantCount + ' 人'
+        : '参与人数待统计',
       tagClass: survey.status === 'open' ? 'tag--green' : 'tag--gray'
     });
   });
@@ -56,7 +56,6 @@ Page({
   data: {
     loading: true,
     logLoading: false,
-    mockMode: config.useMock,
     needBind: false,
     bindStudentNo: '',
     bindNickname: '校园用户',
@@ -74,7 +73,11 @@ Page({
     logType: 'points',
     logs: [],
     mySurveys: [],
-    myResponses: []
+    myResponses: [],
+    canEditNickname: !!api.capabilities.updateNickname,
+    canOnboard: !!api.capabilities.onboard,
+    hasLedger: !!api.capabilities.ledger,
+    hasResponses: !!api.capabilities.responses
   },
 
   onShow() {
@@ -315,22 +318,6 @@ Page({
         encodeURIComponent(response.surveyId) +
         '&responseId=' +
         encodeURIComponent(response.id)
-    });
-  },
-
-  onResetDemo() {
-    wx.showModal({
-      title: '重置演示数据',
-      content: '将清空登录状态、问卷、积分、信誉与流水，重新开始演示。仅 Mock 模式可用。',
-      confirmText: '重置',
-      confirmColor: '#dc2626',
-      success: (res) => {
-        if (!res.confirm) return;
-        mockServer.reset();
-        const app = getApp();
-        app.clearSession();
-        wx.reLaunch({ url: '/pages/login/index' });
-      }
     });
   }
 });

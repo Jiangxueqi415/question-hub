@@ -143,3 +143,39 @@
   color: #8a94a6;
   box-shadow: 0 20rpx 60rpx rgba(31, 58, 110, 0.12);
 }
+
+.login-bind__title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.login-bind__desc {
+  margin: 10rpx 0 28rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+  color: #8a94a6;
+}
+
+.login-field {
+  margin-bottom: 22rpx;
+}
+
+.login-field__label {
+  display: block;
+  margin-bottom: 10rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #374151;
+}
+
+.login-field__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20rpx 22rpx;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 14rpx;
+  background: #f9fafb;
+  font-size: 28rpx;
+  color: #111827;
+}

@@ -36,10 +36,11 @@ Page({
     mode: 'bar',
     survey: null,
     questions: [],
-    participantCount: 0,
+    participantCount: null,
     responseCount: 0,
     statusText: '',
-    closed: false
+    closed: false,
+    canManage: false
   },
 
   onLoad(options) {
@@ -101,7 +102,7 @@ Page({
           error: '',
           survey: result,
           questions: questions,
-          participantCount: result.participantCount || 0,
+          participantCount: result.participantCount != null ? result.participantCount : null,
           responseCount: result.responseCount || 0,
           statusText: result.statusText || '',
           closed: result.status !== 'open'

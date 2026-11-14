@@ -5,7 +5,7 @@
   </view>
 
   <view class="survey-card__meta">
-    发布者 {{survey.ownerName}} · 预计 {{survey.minutes}} 分钟 · {{survey.questionCount}} 题 · {{survey.participantCount}} 人参与
+    发布者 {{survey.ownerName}} · 预计 {{survey.minutes}} 分钟 · {{survey.questionCount}} 题<text wx:if="{{survey.participantCount !== null}}"> · {{survey.participantCount}} 人参与</text>
   </view>
 
   <view class="survey-card__foot">

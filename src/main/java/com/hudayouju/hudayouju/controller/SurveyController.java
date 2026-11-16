@@ -56,7 +56,11 @@ public class SurveyController {
         survey.setOwnerId(user.getId());
         survey.setTitle((String) body.get("title"));
         survey.setCategory((String) body.get("category"));
-        survey.setMinutes((Integer) body.get("minutes"));
+
+        // 容错处理：前端传的 minutes 可能是 String 也可能是 Integer
+        Object minutesObj = body.get("minutes");
+        survey.setMinutes(minutesObj != null ? Integer.parseInt(minutesObj.toString()) : 5);
+
         survey.setQuestionsJson((String) body.get("questionsJson"));
         survey.setStartAt(LocalDateTime.now());
         survey.setEndAt(LocalDateTime.now().plusDays(7));
@@ -82,8 +86,13 @@ public class SurveyController {
                                  @RequestBody Map<String, Object> body,
                                  @RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+
         long timeSpentSeconds = Long.parseLong(body.getOrDefault("timeSpentSeconds", "10").toString());
-        String answersJson = body.getOrDefault("answers", "[]").toString();
+
+        // 🔥 终极容错：无论前端传的是 JSON 对象还是字符串，统统安全转为字符串
+        Object answersObj = body.get("answers");
+        String answersJson = (answersObj != null) ? answersObj.toString() : "[]";
+
         String resultMsg = surveyService.submitSurvey(id, user.getId(), timeSpentSeconds, answersJson);
         return Result.success(resultMsg);
     }
@@ -111,9 +120,20 @@ public class SurveyController {
 
         List<Response> responses = responseRepository.findBySurveyId(id);
 
-        long validCount = responses.stream().filter(r -> "valid".equals(r.getStatus())).count();
-        long invalidCount = responses.stream().filter(r -> "invalid".equals(r.getStatus())).count();
-        long incompleteCount = responses.stream().filter(r -> "incomplete".equals(r.getStatus())).count();
+        int validCount = 0;
+        int invalidCount = 0;
+        int incompleteCount = 0;
+
+        for (int i = 0; i < responses.size(); i++) {
+            Response r = responses.get(i);
+            if ("valid".equals(r.getStatus())) {
+                validCount++;
+            } else if ("invalid".equals(r.getStatus())) {
+                invalidCount++;
+            } else if ("incomplete".equals(r.getStatus())) {
+                incompleteCount++;
+            }
+        }
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("surveyTitle", survey.getTitle());

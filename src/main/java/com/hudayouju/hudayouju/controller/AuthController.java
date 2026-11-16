@@ -28,6 +28,7 @@ public class AuthController {
         this.creditLedgerRepository = creditLedgerRepository;
     }
 
+    // 1. 登录
     @PostMapping("/login")
     public Result<Object> login(@RequestBody Map<String, String> body) {
         String openid = body.getOrDefault("mockOpenid", "mock_openid_123");
@@ -49,6 +50,7 @@ public class AuthController {
         }
     }
 
+    // 2. 绑定学号
     @PostMapping("/bind")
     public Result<Object> bind(@RequestBody Map<String, String> body) {
         String openid = body.get("openid");
@@ -80,32 +82,63 @@ public class AuthController {
         return Result.success(data);
     }
 
-    // 查流水接口（直接从 Header 解析 Token，不走拦截器传参）
+    // 3. 查个人流水
     @GetMapping("/ledger")
     public Result<Object> getLedger(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        // 1. 检查 Token
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return Result.error(401, "未提供 Token 或格式错误");
         }
 
         try {
-            // 2. 解析 Token 拿到 openid
             String token = authHeader.substring(7);
             String openid = JwtUtil.verify(token);
-
-            // 3. 查用户
             User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
 
-            // 4. 组装流水数据
             Map<String, Object> data = new HashMap<>();
             data.put("points", user.getPoints());
             data.put("credit", user.getCredit());
             data.put("pointLedgers", pointLedgerRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
             data.put("creditLedgers", creditLedgerRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
-
             return Result.success(data);
         } catch (Exception e) {
             return Result.error(401, "Token 无效或已过期");
         }
+    }
+
+    // 4. 🔥 领新人任务 (+40 信誉)
+    @PostMapping("/onboard")
+    public Result<Object> onboard(@RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        if (user.getCredit() > 0) {
+            return Result.error(400, "已经领取过新人任务啦");
+        }
+
+        user.setCredit(user.getCredit() + 40);
+        userRepository.save(user);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("user", user);
+        data.put("creditDelta", 40);
+        data.put("already", false);
+        return Result.success(data);
+    }
+
+    // 5.修改昵称
+    @PatchMapping("/me")
+    public Result<Object> updateNickname(@RequestBody Map<String, String> body, @RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+        String newNickname = body.get("nickname");
+
+        if (newNickname == null || newNickname.trim().length() < 2) {
+            return Result.error(400, "昵称不能少于2个字");
+        }
+
+        user.setNickname(newNickname);
+        userRepository.save(user);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("user", user);
+        return Result.success(data);
     }
 }

@@ -12,7 +12,7 @@ public class Result<T> {
     }
 
     public static <T> Result<T> success(T data) {
-        return new Result<>(200, "success", data);
+        return new Result<>(0, "success", data);
     }
 
     public static <T> Result<T> error(Integer code, String message) {

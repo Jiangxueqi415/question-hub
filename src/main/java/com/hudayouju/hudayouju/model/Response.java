@@ -4,8 +4,12 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "responses")
+@Table(name = "responses", uniqueConstraints = {
+        // 修复 S-5：保证同一个用户对同一份问卷只能有一条记录
+        @UniqueConstraint(columnNames = {"surveyId", "userId"})
+})
 public class Response {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,7 +24,8 @@ public class Response {
     private String status;
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // 省略 getter/setter，IDEA 可以用 Alt+Insert 一键生成（如果没有红字的话）
+    public Response() {}
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getSurveyId() { return surveyId; }

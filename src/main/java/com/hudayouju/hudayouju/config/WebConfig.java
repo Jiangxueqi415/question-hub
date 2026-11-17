@@ -16,18 +16,21 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 拦截所有 /api 开头的请求
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")
-                // 登录和绑定接口不能拦，不然没人能拿到 Token！
                 .excludePathPatterns("/api/auth/**");
     }
 
-    // 顺便把全局跨域配置也写在这
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns("*")
+                // 修复 S-3：只允许本地和局域网访问，防止恶意网站跨域请求
+                .allowedOriginPatterns(
+                        "http://localhost:*",
+                        "http://127.0.0.1:*",
+                        "http://10.*.*.*:*",
+                        "http://192.168.*.*:*"
+                )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);

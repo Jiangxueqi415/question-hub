@@ -6,39 +6,48 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
+    // 🔥 S-10 修复：简易内存限流（防止脚本狂刷）
+    private final Map<String, Long> lastRequestTime = new ConcurrentHashMap<>();
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 1. 浏览器跨域时的 OPTIONS 预检请求，直接放行
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            return true;
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
+
+        // 限流控制：同一个 IP 300 毫秒内只能请求 1 次
+        String ip = request.getRemoteAddr();
+        long now = System.currentTimeMillis();
+        Long lastTime = lastRequestTime.get(ip);
+        if (lastTime != null && now - lastTime < 300) {
+            response.setStatus(429);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\": 429, \"message\": \"操作太频繁，请稍后再试\"}");
+            return false;
         }
+        lastRequestTime.put(ip, now);
 
-        // 2. 从请求头获取 Token
+        // 下面的 Token 校验
         String authHeader = request.getHeader("Authorization");
-
-        // 3. 如果没带，或者不是 Bearer 开头，直接打回 401
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.setStatus(401);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\": 401, \"message\": \"请先登录，缺少通行证\"}");
+            response.getWriter().write("{\"error\":\"请先登录，没有通行证不能进！\"}");
             return false;
         }
-
         try {
-            // 4. 验签（如果是伪造的 Token 会报错）
             String token = authHeader.substring(7);
             String openid = JwtUtil.verify(token);
-
-            // 把 openid 存入 request，后面 Controller 可能会用到
             request.setAttribute("openid", openid);
-            return true; // 放行
+            return true;
         } catch (Exception e) {
             response.setStatus(401);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\": 401, \"message\": \"通行证无效或已过期\"}");
+            response.getWriter().write("{\"error\":\"通行证无效或已过期\"}");
             return false;
         }
     }

@@ -48,7 +48,6 @@ public class SurveyController {
         return Result.success(surveyRepository.findAll());
     }
 
-    // 🔥 S-4 修复：发布问卷加事务控制，防止扣了积分没存上问卷
     @Transactional(rollbackFor = Exception.class)
     @PostMapping
     public Result<Object> publish(@RequestBody Map<String, Object> body, @RequestAttribute String openid) {
@@ -82,14 +81,11 @@ public class SurveyController {
         return Result.success("发布成功");
     }
 
-    // 🔥 P0-3 修复：安全接收 answers 对象
     @PostMapping("/{id}/submit")
     public Result<Object> submit(@PathVariable Long id,
                                  @RequestBody Map<String, Object> body,
                                  @RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
-
-        // 如果没有传时间，默认给 0（直接触发极速拦截）
         long timeSpentSeconds = Long.parseLong(body.getOrDefault("timeSpentSeconds", "0").toString());
 
         Object answersObj = body.get("answers");

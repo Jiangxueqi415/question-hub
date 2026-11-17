@@ -1,6 +1,7 @@
 package com.hudayouju.hudayouju.controller;
 
 import com.hudayouju.hudayouju.common.Result;
+import com.hudayouju.hudayouju.model.CreditLedger;
 import com.hudayouju.hudayouju.model.User;
 import com.hudayouju.hudayouju.repository.CreditLedgerRepository;
 import com.hudayouju.hudayouju.repository.PointLedgerRepository;
@@ -28,14 +29,10 @@ public class AuthController {
         this.creditLedgerRepository = creditLedgerRepository;
     }
 
-    // 修复 P0-2：兼容前端传 code
     @PostMapping("/login")
     public Result<Object> login(@RequestBody Map<String, String> body) {
-        // 如果前端传了 mockOpenid 用前端的，如果传了 code 就拿 code 当 openid
         String openid = body.get("mockOpenid");
-        if (openid == null) {
-            openid = body.get("code");
-        }
+        if (openid == null) openid = body.get("code");
         if (openid == null) openid = "mock_openid_123";
 
         var optionalUser = userRepository.findByOpenid(openid);
@@ -87,7 +84,6 @@ public class AuthController {
         return Result.success(data);
     }
 
-    // 查流水
     @GetMapping("/ledger")
     public Result<Object> getLedger(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -113,8 +109,17 @@ public class AuthController {
     public Result<Object> onboard(@RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
         if (user.getCredit() > 0) return Result.error(400, "已经领取过啦");
+
         user.setCredit(user.getCredit() + 40);
         userRepository.save(user);
+
+        CreditLedger ledger = new CreditLedger();
+        ledger.setUserId(user.getId());
+        ledger.setDelta(40);
+        ledger.setReason("完成新人任务");
+        ledger.setBalanceAfter(user.getCredit());
+        creditLedgerRepository.save(ledger);
+
         Map<String, Object> data = new HashMap<>();
         data.put("user", user);
         return Result.success(data);

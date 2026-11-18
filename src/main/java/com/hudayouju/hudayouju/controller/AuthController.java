@@ -29,6 +29,7 @@ public class AuthController {
         this.creditLedgerRepository = creditLedgerRepository;
     }
 
+    // 1. 登录
     @PostMapping("/login")
     public Result<Object> login(@RequestBody Map<String, String> body) {
         String openid = body.get("mockOpenid");
@@ -53,6 +54,7 @@ public class AuthController {
         }
     }
 
+    // 2. 绑定学号
     @PostMapping("/bind")
     public Result<Object> bind(@RequestBody Map<String, String> body) {
         String openid = body.get("openid");
@@ -74,7 +76,7 @@ public class AuthController {
         newUser.setNickname(nickname);
         newUser.setPoints(0);
         newUser.setCredit(0);
-        newUser.setOnboarded(true);
+        newUser.setOnboarded(false);
         userRepository.save(newUser);
 
         String token = JwtUtil.generate(newUser.getId(), newUser.getOpenid());
@@ -84,6 +86,7 @@ public class AuthController {
         return Result.success(data);
     }
 
+    // 3. 查流水
     @GetMapping("/ledger")
     public Result<Object> getLedger(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -105,34 +108,63 @@ public class AuthController {
         }
     }
 
+    // 4.  领新人任务（已修复 400 报错，直接从 Header 解析 Token）
     @PostMapping("/onboard")
-    public Result<Object> onboard(@RequestAttribute String openid) {
-        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
-        if (user.getCredit() > 0) return Result.error(400, "已经领取过啦");
+    public Result<Object> onboard(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error(401, "未提供 Token");
+        }
 
-        user.setCredit(user.getCredit() + 40);
-        userRepository.save(user);
+        try {
+            String token = authHeader.substring(7);
+            String openid = JwtUtil.verify(token);
 
-        CreditLedger ledger = new CreditLedger();
-        ledger.setUserId(user.getId());
-        ledger.setDelta(40);
-        ledger.setReason("完成新人任务");
-        ledger.setBalanceAfter(user.getCredit());
-        creditLedgerRepository.save(ledger);
+            User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("user", user);
-        return Result.success(data);
+            if (Boolean.TRUE.equals(user.getOnboarded())) {
+                return Result.error(400, "已经领取过啦");
+            }
+
+            user.setCredit(user.getCredit() + 40);
+            user.setOnboarded(true);
+            userRepository.save(user);
+
+            CreditLedger ledger = new CreditLedger();
+            ledger.setUserId(user.getId());
+            ledger.setDelta(40);
+            ledger.setReason("完成新人任务");
+            ledger.setBalanceAfter(user.getCredit());
+            creditLedgerRepository.save(ledger);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("user", user);
+            return Result.success(data);
+
+        } catch (Exception e) {
+            return Result.error(401, "Token 无效或已过期");
+        }
     }
 
+    // 5. 修改昵称
     @PatchMapping("/me")
-    public Result<Object> updateNickname(@RequestBody Map<String, String> body, @RequestAttribute String openid) {
-        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
-        String newNickname = body.get("nickname");
-        if (newNickname != null && newNickname.trim().length() >= 2) {
-            user.setNickname(newNickname);
-            userRepository.save(user);
+    public Result<Object> updateNickname(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error(401, "未提供 Token");
         }
-        return Result.success(user);
+
+        try {
+            String token = authHeader.substring(7);
+            String openid = JwtUtil.verify(token);
+
+            User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+            String newNickname = body.get("nickname");
+            if (newNickname != null && newNickname.trim().length() >= 2) {
+                user.setNickname(newNickname);
+                userRepository.save(user);
+            }
+            return Result.success(user);
+        } catch (Exception e) {
+            return Result.error(401, "Token 无效");
+        }
     }
 }

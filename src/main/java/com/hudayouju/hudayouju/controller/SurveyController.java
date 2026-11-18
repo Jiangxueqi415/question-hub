@@ -81,12 +81,47 @@ public class SurveyController {
         return Result.success("发布成功");
     }
 
+    // 🔥 就是这个接口！前端必须先调它
+    @PostMapping("/{id}/start")
+    public Result<Object> start(@PathVariable Long id, @RequestAttribute String openid) {
+        User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
+        surveyService.startAttempt(id, user.getId());
+        return Result.success("计时开始");
+    }
+
     @PostMapping("/{id}/submit")
     public Result<Object> submit(@PathVariable Long id,
                                  @RequestBody Map<String, Object> body,
                                  @RequestAttribute String openid) {
         User user = userRepository.findByOpenid(openid).orElseThrow(() -> new RuntimeException("用户不存在"));
-        long timeSpentSeconds = Long.parseLong(body.getOrDefault("timeSpentSeconds", "0").toString());
+
+        // timeSpentSeconds 只作服务端计时缺失时的兜底，必须是非负整数
+        Long timeSpentSeconds = null;
+        Object timeObj = body.get("timeSpentSeconds");
+        if (timeObj == null) {
+            // 兼容早期写成 timeSpendSeconds 的调用方
+            timeObj = body.get("timeSpendSeconds");
+        }
+        if (timeObj != null) {
+            if (timeObj instanceof Number number) {
+                double value = number.doubleValue();
+                if (value != Math.floor(value) || value < 0) {
+                    return Result.error(400, "提交失败：timeSpentSeconds 必须是大于等于 0 的整数。");
+                }
+                timeSpentSeconds = number.longValue();
+            } else {
+                String raw = timeObj.toString().trim();
+                try {
+                    long parsed = Long.parseLong(raw);
+                    if (parsed < 0) {
+                        return Result.error(400, "提交失败：timeSpentSeconds 必须是大于等于 0 的整数。");
+                    }
+                    timeSpentSeconds = parsed;
+                } catch (NumberFormatException e) {
+                    return Result.error(400, "提交失败：timeSpentSeconds 必须是大于等于 0 的整数。");
+                }
+            }
+        }
 
         Object answersObj = body.get("answers");
         String answersJson;
@@ -97,11 +132,10 @@ public class SurveyController {
                 answersJson = objectMapper.writeValueAsString(answersObj);
             }
         } catch (Exception e) {
-            answersJson = "{}";
+            return Result.error(400, "提交失败：answers 必须是合法的 JSON 数组。");
         }
 
-        String resultMsg = surveyService.submitSurvey(id, user.getId(), timeSpentSeconds, answersJson);
-        return Result.success(resultMsg);
+        return surveyService.submitSurvey(id, user.getId(), timeSpentSeconds, answersJson);
     }
 
     @GetMapping({"/my", "/me/surveys"})

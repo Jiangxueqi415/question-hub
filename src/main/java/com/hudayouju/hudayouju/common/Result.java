@@ -11,10 +11,12 @@ public class Result<T> {
         this.data = data;
     }
 
+    // 业务成功：code 必须是 0
     public static <T> Result<T> success(T data) {
         return new Result<>(0, "success", data);
     }
 
+    // 业务失败：code 必须是非 0（比如 400, 403, 409）
     public static <T> Result<T> error(Integer code, String message) {
         return new Result<>(code, message, null);
     }
